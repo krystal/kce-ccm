@@ -7,13 +7,16 @@ import (
 )
 
 func newCloudProviderInterface(config io.Reader) (cloudprovider.Interface, error) {
+
+	loadBalancer := NewLoadBalancer()
+
 	return &providerInterface{
-		apiHostname: "katapult-api.dev.adam.ac",
+		loadBalancer: loadBalancer,
 	}, nil
 }
 
 type providerInterface struct {
-	apiHostname string
+	loadBalancer *LoadBalancer
 }
 
 func (c *providerInterface) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
@@ -21,7 +24,7 @@ func (c *providerInterface) Initialize(clientBuilder cloudprovider.ControllerCli
 }
 
 func (c *providerInterface) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return nil, false
+	return c.loadBalancer, true
 }
 
 func (c *providerInterface) Instances() (cloudprovider.Instances, bool) {
