@@ -7,6 +7,5 @@ require (
 	k8s.io/api v0.20.0
 	k8s.io/cloud-provider v0.20.0
 	k8s.io/component-base v0.20.0
-	k8s.io/controller-manager v0.20.0
 	k8s.io/klog/v2 v2.4.0
 )
