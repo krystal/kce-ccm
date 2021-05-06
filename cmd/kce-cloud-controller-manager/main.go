@@ -26,6 +26,10 @@ limitations under the License.
 package main
 
 import (
+	"math/rand"
+	"os"
+	"time"
+
 	"github.com/krystal/kce-ccm/kce"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,9 +42,6 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
-	"math/rand"
-	"os"
-	"time"
 )
 
 func main() {

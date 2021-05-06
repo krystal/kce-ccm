@@ -20,7 +20,6 @@ type providerInterface struct {
 }
 
 func (c *providerInterface) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
-
 }
 
 func (c *providerInterface) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
