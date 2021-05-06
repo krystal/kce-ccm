@@ -2,54 +2,63 @@ package kce
 
 import (
 	"io"
-
 	cloudprovider "k8s.io/cloud-provider"
 )
 
-func newCloudProviderInterface(config io.Reader) (cloudprovider.Interface, error) {
+type Config struct {
+	APIKey string
+}
 
-	loadBalancer := NewLoadBalancer()
+func initProvider(_ io.Reader) (cloudprovider.Interface, error) {
+	c := Config{}
+	// TODO: Fetch environment variables
+	// TODO: Construct go-katapult library with authorisation setup
+	return New(c)
+}
 
-	return &providerInterface{
-		loadBalancer: loadBalancer,
+func New(c Config) (cloudprovider.Interface, error) {
+	return &provider{
+		config:       c,
+		loadBalancer: &LoadBalancer{},
 	}, nil
 }
 
-type providerInterface struct {
+type provider struct {
+	config       Config
 	loadBalancer *LoadBalancer
 }
 
-func (c *providerInterface) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
 
-func (c *providerInterface) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return c.loadBalancer, true
+func (p *provider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+	return p.loadBalancer, true
 }
 
-func (c *providerInterface) Instances() (cloudprovider.Instances, bool) {
+func (p *provider) Instances() (cloudprovider.Instances, bool) {
 	return nil, false
 }
 
-func (c *providerInterface) InstancesV2() (cloudprovider.InstancesV2, bool) {
+func (p *provider) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
 
-func (c *providerInterface) Zones() (cloudprovider.Zones, bool) {
+func (p *provider) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-func (c *providerInterface) Clusters() (cloudprovider.Clusters, bool) {
+func (p *provider) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (c *providerInterface) Routes() (cloudprovider.Routes, bool) {
+func (p *provider) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-func (c *providerInterface) ProviderName() string {
+func (p *provider) ProviderName() string {
 	return ProviderName
 }
 
-func (c *providerInterface) HasClusterID() bool {
+func (p *provider) HasClusterID() bool {
 	return true
 }
