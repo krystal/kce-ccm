@@ -102,7 +102,7 @@ func main() {
 	pflag.CommandLine.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	// utilflag.InitFlags()
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.FlushLogs() // TODO: This defer doesn't do anything.
 
 	// the flags could be set before execute
 	command.Flags().VisitAll(func(flag *pflag.Flag) {
