@@ -18,7 +18,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: get dependencies
-        run: go get
+        run: go mod download
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
