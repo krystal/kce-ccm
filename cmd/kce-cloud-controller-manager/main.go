@@ -61,6 +61,8 @@ func main() {
 	// Create a CCM Command instance
 	command := app.NewCloudControllerManagerCommand(opts, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
 
+	// TODO: Switch to utilflag.InitFlags() once k8s switches to Cobra
+	// https://github.com/kubernetes/cloud-provider-gcp/issues/215
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
