@@ -1,12 +1,20 @@
 package kce
 
 import (
+	"context"
+	"fmt"
+	"github.com/krystal/go-katapult"
+	"github.com/krystal/go-katapult/core"
+	"github.com/sethvargo/go-envconfig"
 	"io"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
+	"net/url"
 )
 
 type Config struct {
-	APIKey string
+	APIKey  string `env:"KATAPULT_API_TOKEN"`
+	APIHost string `env:"KATAPULT_API_HOST"`
 }
 
 // providerFactory creates any dependencies needed by the provider and passes
@@ -15,25 +23,54 @@ type Config struct {
 // file.
 func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 	c := Config{}
-	// TODO: Fetch environment variables
-	// TODO: Construct go-katapult library with authorisation setup
-	return New(c)
+
+	err := envconfig.Process(context.TODO(), &c)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.APIKey == "" {
+		return nil, fmt.Errorf("api key is not configured")
+	}
+
+	apiUrl := katapult.DefaultURL
+	if c.APIHost != "" {
+		klog.Info("default API base URL overrided", "url", c.APIHost)
+		apiUrl, err = url.Parse(c.APIHost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse provided api url: %w", err)
+		}
+	}
+
+	client, err := katapult.New(
+		katapult.WithAPIKey(c.APIKey),
+		katapult.WithBaseURL(apiUrl),
+		katapult.WithUserAgent("kce-ccm"), // TODO: Add version.
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return New(c, core.New(client))
 }
 
 // New returns a new provider using the provided dependencies.
-func New(c Config) (cloudprovider.Interface, error) {
+func New(c Config, client *core.Client) (cloudprovider.Interface, error) {
 	return &provider{
+		katapult:     client,
 		config:       c,
 		loadBalancer: &LoadBalancer{},
 	}, nil
 }
 
 type provider struct {
+	katapult     *core.Client
 	config       Config
 	loadBalancer *LoadBalancer
 }
 
 func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	// TODO: Assess if we actually need anything here
 }
 
 // LoadBalancer returns our implementation of the LoadBalancer provider
