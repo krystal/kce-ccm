@@ -15,6 +15,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
+          args: --timeout 5m0s
         env:
           VERBOSE: "true"
   unit-test:
