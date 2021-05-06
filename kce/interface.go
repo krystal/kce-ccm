@@ -9,13 +9,18 @@ type Config struct {
 	APIKey string
 }
 
-func initProvider(_ io.Reader) (cloudprovider.Interface, error) {
+// providerFactory creates any dependencies needed by the provider and passes
+// them into New. For now, we will source config from the environment, but we
+// k8s CCM provides us with an io.Reader which can be used to read a config
+// file.
+func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 	c := Config{}
 	// TODO: Fetch environment variables
 	// TODO: Construct go-katapult library with authorisation setup
 	return New(c)
 }
 
+// New returns a new provider using the provided dependencies.
 func New(c Config) (cloudprovider.Interface, error) {
 	return &provider{
 		config:       c,
@@ -31,6 +36,7 @@ type provider struct {
 func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
 
+// LoadBalancer returns our implementation of the LoadBalancer provider
 func (p *provider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return p.loadBalancer, true
 }

@@ -9,5 +9,5 @@ const (
 )
 
 func init() {
-	cloudprovider.RegisterCloudProvider(ProviderName, initProvider)
+	cloudprovider.RegisterCloudProvider(ProviderName, providerFactory)
 }
