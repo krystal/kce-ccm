@@ -28,7 +28,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/krystal/kceccm/kce"
+	"github.com/krystal/kce-ccm/kce"
 	"github.com/spf13/pflag"
 
 	cloudprovider "k8s.io/cloud-provider"

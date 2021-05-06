@@ -1,4 +1,4 @@
-module github.com/krystal/kceccm
+module github.com/krystal/kce-ccm
 
 go 1.15
 
