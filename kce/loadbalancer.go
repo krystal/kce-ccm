@@ -31,22 +31,44 @@ func NewLoadBalancer() *LoadBalancer {
 type LoadBalancer struct {
 }
 
+// GetLoadBalancer returns whether the specified load balancer exists, and
+// if so, what its status is.
+// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	return nil, false, nil
 }
 
+// GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
+// *v1.Service parameter as read-only and not modify it.
 func (lb *LoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	return ""
 }
 
+// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
+// Implementations must treat the *v1.Service and *v1.Node
+// parameters as read-only and not modify them.
+// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	return nil, errors.New("EnsureLoadBalancer not implemented")
 }
 
+// UpdateLoadBalancer updates hosts under the specified load balancer.
+// Implementations must treat the *v1.Service and *v1.Node
+// parameters as read-only and not modify them.
+// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	return errors.New("UpdateLoadBalancer not implemented")
 }
 
+// EnsureLoadBalancerDeleted deletes the specified load balancer if it
+// exists, returning nil if the load balancer specified either didn't exist or
+// was successfully deleted.
+// This construction is useful because many cloud providers' load balancers
+// have multiple underlying components, meaning a Get could say that the LB
+// doesn't exist even if some part of it is still laying around.
+// Implementations must treat the *v1.Service parameter as read-only and not modify it.
+// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	return errors.New("EnsureLoadBalancerDeleted not implemented")
 }
