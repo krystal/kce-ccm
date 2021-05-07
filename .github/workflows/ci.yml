@@ -58,5 +58,5 @@ jobs:
         push: true
         context: .
         tags: |
-          gchr.io/krystal/kce-ccm:latest
-          gchr.io/krystal/kce-ccm:${{ steps.get_version.outputs.VERSION }}
+          ghcr.io/krystal/kce-ccm:latest
+          ghcr.io/krystal/kce-ccm:${{ steps.get_version.outputs.VERSION }}
