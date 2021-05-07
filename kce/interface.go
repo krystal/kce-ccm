@@ -32,20 +32,37 @@ func (c Config) dcRef() *core.DataCenter {
 	}
 }
 
-// providerFactory creates any dependencies needed by the provider and passes
-// them into New. For now, we will source config from the environment, but we
-// k8s CCM provides us with an io.Reader which can be used to read a config
-// file.
-func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
+func loadConfig(lookuper envconfig.Lookuper) (*Config, error) {
 	c := Config{}
 
-	err := envconfig.Process(context.TODO(), &c)
+	err := envconfig.ProcessWith(context.TODO(), &c, lookuper)
 	if err != nil {
 		return nil, err
 	}
 
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("api key is not configured")
+	}
+
+	if c.OrganizationID == "" {
+		return nil, fmt.Errorf("organization id is not set")
+	}
+
+	if c.DataCenterID == "" {
+		return nil, fmt.Errorf("data center id is not set")
+	}
+
+	return &c, nil
+}
+
+// providerFactory creates any dependencies needed by the provider and passes
+// them into New. For now, we will source config from the environment, but we
+// k8s CCM provides us with an io.Reader which can be used to read a config
+// file.
+func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
+	c, err := loadConfig(envconfig.OsLookuper())
+	if err != nil {
+		return nil, err
 	}
 
 	apiUrl := katapult.DefaultURL
@@ -57,7 +74,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 		}
 	}
 
-	client, err := katapult.New(
+	rm, err := katapult.New(
 		katapult.WithAPIKey(c.APIKey),
 		katapult.WithBaseURL(apiUrl),
 		katapult.WithUserAgent("kce-ccm"), // TODO: Add version.
@@ -65,18 +82,13 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	client := core.New(rm)
 
-	return New(c, core.New(client))
-}
-
-// New returns a new provider using the provided dependencies.
-func New(c Config, client *core.Client) (cloudprovider.Interface, error) {
-	// TODO: Interface for client rather than concrete type <3
 	return &provider{
 		katapult: client,
-		config:   c,
+		config:   *c,
 		loadBalancer: &LoadBalancer{
-			config:                 c,
+			config:                 *c,
 			loadBalancerController: client.LoadBalancers,
 		},
 	}, nil

@@ -115,7 +115,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	if balancer == nil {
 		balancer, _, err = lb.loadBalancerController.Create(ctx, lb.config.orgRef(), &core.LoadBalancerCreateArguments{
 			Name:       name,
-			DataCenter: &core.DataCenter{},
+			DataCenter: lb.config.dcRef(),
 		})
 		if err != nil {
 			return nil, err
