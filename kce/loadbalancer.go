@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/krystal/go-katapult"
+	"github.com/krystal/go-katapult/core"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
@@ -26,18 +27,35 @@ import (
 // LB services must be managed in the alternate implementation.
 
 type loadBalancerController interface {
-	Get()
+	List(ctx context.Context, org *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error)
 }
 
 type LoadBalancer struct {
 	loadBalancerController loadBalancerController
 }
 
-func loadBalancerName(clusterName string, serviceUID types.UID) string {
+var lbNotFound = fmt.Errorf("lb not found")
+
+func (lb *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
+	list, _, err := lb.loadBalancerController.List(ctx, &core.Organization{}, &core.ListOptions{PerPage: 100})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, potentialMatch := range list {
+		if potentialMatch.Name == name {
+			return potentialMatch, nil
+		}
+	}
+
+	return nil, lbNotFound
+}
+
+func loadBalancerName(clusterName string, service *v1.Service) string {
 	// kubernetes uid looks like this "b5216b07-2cb4-4429-8294-23883301a01e"
 	// we want to produce a deterministic load balancer name from this.
 	// katapult has a limit of 255 characters on name length
-	return fmt.Sprintf("k8s-%s-%s", clusterName, serviceUID)
+	return fmt.Sprintf("k8s-%s-%s", clusterName, service.UID)
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -45,14 +63,28 @@ func loadBalancerName(clusterName string, serviceUID types.UID) string {
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	lb.loadBalancerController.Get()
-	return nil, false, nil
+	foundLb, err := lb.getLoadBalancer(ctx, loadBalancerName(clusterName, service))
+	if err != nil {
+		if err == lbNotFound {
+			return nil, false, nil
+		}
+
+		return nil, false, err
+	}
+
+	return &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				IP: foundLb.IPAddress.Address,
+			},
+		},
+	}, true, nil
 }
 
 // GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
 // *v1.Service parameter as read-only and not modify it.
-func (lb *LoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	return loadBalancerName(clusterName, service.UID)
+func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName string, service *v1.Service) string {
+	return loadBalancerName(clusterName, service)
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
