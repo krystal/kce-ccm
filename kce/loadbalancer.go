@@ -26,6 +26,7 @@ import (
 // LB services must be managed in the alternate implementation.
 
 type loadBalancerController interface {
+	Get()
 }
 
 type LoadBalancer struct {
@@ -44,6 +45,7 @@ func loadBalancerName(clusterName string, serviceUID types.UID) string {
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
+	lb.loadBalancerController.Get()
 	return nil, false, nil
 }
 
