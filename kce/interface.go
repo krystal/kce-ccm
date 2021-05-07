@@ -56,6 +56,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 
 // New returns a new provider using the provided dependencies.
 func New(c Config, client *core.Client) (cloudprovider.Interface, error) {
+	// TODO: Interface for client rather than concrete type <3
 	return &provider{
 		katapult:     client,
 		config:       c,

@@ -3,8 +3,9 @@ package kce
 import (
 	"context"
 	"errors"
-
+	"fmt"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
@@ -24,7 +25,18 @@ import (
 // irrespective of the ImplementedElsewhere error. Additional finalizers for
 // LB services must be managed in the alternate implementation.
 
+type loadBalancerController interface {
+}
+
 type LoadBalancer struct {
+	loadBalancerController loadBalancerController
+}
+
+func loadBalancerName(clusterName string, serviceUID types.UID) string {
+	// kubernetes uid looks like this "b5216b07-2cb4-4429-8294-23883301a01e"
+	// we want to produce a deterministic load balancer name from this.
+	// katapult has a limit of 255 characters on name length
+	return fmt.Sprintf("k8s-%s-%s", clusterName, serviceUID)
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -38,7 +50,7 @@ func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string,
 // GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
 // *v1.Service parameter as read-only and not modify it.
 func (lb *LoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	return ""
+	return loadBalancerName(clusterName, service.UID)
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
