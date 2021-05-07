@@ -15,6 +15,21 @@ import (
 type Config struct {
 	APIKey  string `env:"KATAPULT_API_TOKEN"`
 	APIHost string `env:"KATAPULT_API_HOST"`
+
+	OrganizationID string `env:"KATAPULT_ORGANIZATION_RID"`
+	DataCenterID   string `env:"KATAPULT_DATA_CENTER_RID"`
+}
+
+func (c Config) orgRef() *core.Organization {
+	return &core.Organization{
+		ID: c.OrganizationID,
+	}
+}
+
+func (c Config) dcRef() *core.DataCenter {
+	return &core.DataCenter{
+		ID: c.DataCenterID,
+	}
 }
 
 // providerFactory creates any dependencies needed by the provider and passes
@@ -58,9 +73,12 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 func New(c Config, client *core.Client) (cloudprovider.Interface, error) {
 	// TODO: Interface for client rather than concrete type <3
 	return &provider{
-		katapult:     client,
-		config:       c,
-		loadBalancer: &LoadBalancer{},
+		katapult: client,
+		config:   c,
+		loadBalancer: &LoadBalancer{
+			config:                 c,
+			loadBalancerController: client.LoadBalancers,
+		},
 	}, nil
 }
 

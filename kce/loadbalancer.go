@@ -34,6 +34,7 @@ type loadBalancerController interface {
 }
 
 type LoadBalancer struct {
+	config                 Config
 	loadBalancerController loadBalancerController
 }
 
@@ -43,7 +44,7 @@ var lbNotFound = fmt.Errorf("lb not found")
 // find a specific load balancer. This will eventually be replaced with a
 // bespoke API field to avoid this.
 func (lb *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
-	list, _, err := lb.loadBalancerController.List(ctx, &core.Organization{}, &core.ListOptions{PerPage: 100})
+	list, _, err := lb.loadBalancerController.List(ctx, lb.config.orgRef(), &core.ListOptions{PerPage: 100})
 	if err != nil {
 		return nil, err
 	}
@@ -93,27 +94,42 @@ func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName strin
 	return loadBalancerName(clusterName, service)
 }
 
+func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
+	// Ensure a rule exists for each port :)
+	// Should clean up unneeded rules
+	return nil
+}
+
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 // Implementations must treat the *v1.Service and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	// Get
-	foundLb, err := lb.getLoadBalancer(ctx, loadBalancerName(clusterName, service))
+	name := loadBalancerName(clusterName, service)
+	balancer, err := lb.getLoadBalancer(ctx, name)
 	if err != nil && err != lbNotFound {
 		return nil, err
 	}
 
-	ip := ""
-	if foundLb != nil {
-		// Update existing LB
-	} else {
-		// Create LB
+	if balancer == nil {
+		balancer, _, err = lb.loadBalancerController.Create(ctx, lb.config.orgRef(), &core.LoadBalancerCreateArguments{
+			Name:       name,
+			DataCenter: &core.DataCenter{},
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = lb.ensureLoadBalancerRules(ctx, service, balancer)
+	if err != nil {
+		return nil, err
 	}
 
 	return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
 		{
-			IP: ip,
+			IP: balancer.IPAddress.Address,
 		},
 	}}, nil
 }
