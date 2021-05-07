@@ -37,6 +37,7 @@ jobs:
       env:
         VERBOSE: "true"
   build-release:
+    name: Build Release
     runs-on: ubuntu-latest
     if: contains(github.ref, 'refs/tags/')
     steps:
