@@ -28,6 +28,9 @@ import (
 
 type loadBalancerController interface {
 	List(ctx context.Context, org *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error)
+	Delete(ctx context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error)
+	Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error)
+	Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error)
 }
 
 type LoadBalancer struct {
@@ -36,6 +39,9 @@ type LoadBalancer struct {
 
 var lbNotFound = fmt.Errorf("lb not found")
 
+// getLoadBalancer lists all load balancers for an organisation and attemots to
+// find a specific load balancer. This will eventually be replaced with a
+// bespoke API field to avoid this.
 func (lb *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
 	list, _, err := lb.loadBalancerController.List(ctx, &core.Organization{}, &core.ListOptions{PerPage: 100})
 	if err != nil {
@@ -92,7 +98,24 @@ func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName strin
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	return nil, errors.New("EnsureLoadBalancer not implemented")
+	// Get
+	foundLb, err := lb.getLoadBalancer(ctx, loadBalancerName(clusterName, service))
+	if err != nil && err != lbNotFound {
+		return nil, err
+	}
+
+	ip := ""
+	if foundLb != nil {
+		// Update existing LB
+	} else {
+		// Create LB
+	}
+
+	return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
+		{
+			IP: ip,
+		},
+	}}, nil
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
