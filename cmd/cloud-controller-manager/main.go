@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// The kce-cloud-controller-manager injects the KCE provider and then hands off
+// The cloud-controller-manager injects the KCE provider and then hands off
 // to the k8s CCM command.
 //
 // The following is based on guidance based on:
