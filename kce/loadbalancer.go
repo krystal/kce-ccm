@@ -33,9 +33,13 @@ type loadBalancerController interface {
 	Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error)
 }
 
+type loadBalancerRuleController interface {
+}
+
 type LoadBalancer struct {
-	config                 Config
-	loadBalancerController loadBalancerController
+	config                     Config
+	loadBalancerController     loadBalancerController
+	loadBalancerRuleController loadBalancerRuleController
 }
 
 var lbNotFound = fmt.Errorf("lb not found")
@@ -88,15 +92,30 @@ func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string,
 	}, true, nil
 }
 
-// GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
-// *v1.Service parameter as read-only and not modify it.
+// GetLoadBalancerName returns the name of the load balancer. Implementations
+// must treat the *v1.Service parameter as read-only and not modify it.
 func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName string, service *v1.Service) string {
 	return loadBalancerName(clusterName, service)
 }
 
+// tidyLoadBalancerRules deletes rules that are no longer in use by the service
+func (lb *LoadBalancer) tidyLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
+	// 1. Fetch all rules
+	// 2. Try to match rule port to service port
+	// 3. No match? Delete. Log message and metric.
+
+	return nil
+}
+
+// ensureLoadBalancerRules creates or update LB rules to match the ports exposed
+// by a kubernetes service.
 func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
 	// Ensure a rule exists for each port :)
-	// Should clean up unneeded rules
+	for _, port := range service.Spec.Ports {
+		// If rule exists with external port, ensure match or update
+		// If no rule exists, create
+	}
+
 	return nil
 }
 
@@ -127,6 +146,11 @@ func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return nil, err
 	}
 
+	err = lb.tidyLoadBalancerRules(ctx, service, balancer)
+	if err != nil {
+		return nil, err
+	}
+
 	return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
 		{
 			IP: balancer.IPAddress.Address,
@@ -152,5 +176,15 @@ func (lb *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName stri
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	return errors.New("EnsureLoadBalancerDeleted not implemented")
+	name := loadBalancerName(clusterName, service)
+	balancer, err := lb.getLoadBalancer(ctx, name)
+	if err != nil {
+		if err == lbNotFound { // If it doesn't exist, good!
+			return nil
+		}
+		return err
+	}
+
+	_, _, err = lb.loadBalancerController.Delete(ctx, balancer)
+	return err
 }
