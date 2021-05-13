@@ -7,6 +7,7 @@ import (
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
@@ -34,6 +35,10 @@ type loadBalancerController interface {
 }
 
 type loadBalancerRuleController interface {
+	List(ctx context.Context, lb *core.LoadBalancer, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error)
+	Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error)
+	Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
+	Create(ctx context.Context, org *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
 }
 
 type LoadBalancer struct {
@@ -49,6 +54,7 @@ var lbNotFound = fmt.Errorf("lb not found")
 // bespoke API field to avoid this.
 func (lb *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
 	list, _, err := lb.loadBalancerController.List(ctx, lb.config.orgRef(), &core.ListOptions{PerPage: 100})
+	// TODO: pagination
 	if err != nil {
 		return nil, err
 	}
@@ -99,21 +105,86 @@ func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName strin
 }
 
 // tidyLoadBalancerRules deletes rules that are no longer in use by the service
+// TODO: Instrumentation for number of entities cleaned up
 func (lb *LoadBalancer) tidyLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
-	// 1. Fetch all rules
-	// 2. Try to match rule port to service port
-	// 3. No match? Delete. Log message and metric.
+	rules, _, err := lb.loadBalancerRuleController.List(ctx, balancer, nil)
+	// TODO pagination concerns
+	if err != nil {
+		return err
+	}
+
+	for _, rule := range rules {
+		inUse := false
+		for _, servicePort := range service.Spec.Ports {
+			if rule.ListenPort == int(servicePort.Port) {
+				inUse = true
+				break
+			}
+		}
+
+		if !inUse {
+			_, _, err := lb.loadBalancerRuleController.Delete(ctx, &rule)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
 
 // ensureLoadBalancerRules creates or update LB rules to match the ports exposed
 // by a kubernetes service.
+// TODO: Instrumentation for number of entities created etc
 func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
-	// Ensure a rule exists for each port :)
-	for _, port := range service.Spec.Ports {
-		// If rule exists with external port, ensure match or update
-		// If no rule exists, create
+	rules, _, err := lb.loadBalancerRuleController.List(ctx, balancer, nil)
+	// TODO pagination concerns
+	if err != nil {
+		return err
+	}
+
+	for _, servicePort := range service.Spec.Ports {
+		// attempt to match existing rule to service port based on Port and ListenPort
+		var foundRule *core.LoadBalancerRule
+		for _, rule := range rules {
+			if rule.ListenPort == int(servicePort.Port) {
+				foundRule = &rule
+			}
+		}
+
+		proxyProtocol := false
+		lbRuleArgs := core.LoadBalancerRuleArguments{
+			Algorithm:       core.RoundRobinRuleAlgorithm,
+			DestinationPort: int(servicePort.NodePort),
+			ListenPort:      int(servicePort.Port),
+			Protocol:        core.TCPProtocol,
+			ProxyProtocol:   &proxyProtocol,
+		}
+
+		if foundRule == nil {
+			klog.InfoS("creating lb rule",
+				"lbId", balancer.ID,
+				"serviceId", service.UID,
+				"servicePort", servicePort.Port,
+			)
+			_, _, err := lb.loadBalancerRuleController.Create(ctx, balancer, lbRuleArgs)
+
+			if err != nil {
+				return err
+			}
+		} else {
+			klog.InfoS("updating lb rule",
+				"lbId", balancer.ID,
+				"ruleId", foundRule.ID,
+				"serviceId", service.UID,
+				"servicePort", servicePort.Port,
+			)
+			// TODO: Matcher to avoid unnecessary updates
+			_, _, err := lb.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -124,13 +195,13 @@ func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	// Get
 	name := loadBalancerName(clusterName, service)
 	balancer, err := lb.getLoadBalancer(ctx, name)
 	if err != nil && err != lbNotFound {
 		return nil, err
 	}
 
+	// If load balancer doesn't exist create it
 	if balancer == nil {
 		balancer, _, err = lb.loadBalancerController.Create(ctx, lb.config.orgRef(), &core.LoadBalancerCreateArguments{
 			Name:       name,
@@ -140,6 +211,8 @@ func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName stri
 			return nil, err
 		}
 	}
+	// If it already exists, there's not many fields we need to update
+	// We do need to update the associated LoadBalancer rules though.
 
 	err = lb.ensureLoadBalancerRules(ctx, service, balancer)
 	if err != nil {

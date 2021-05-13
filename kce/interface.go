@@ -67,7 +67,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 
 	apiUrl := katapult.DefaultURL
 	if c.APIHost != "" {
-		klog.Info("default API base URL overrided", "url", c.APIHost)
+		klog.InfoS("default API base URL overrided", "url", c.APIHost)
 		apiUrl, err = url.Parse(c.APIHost)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse provided api url: %w", err)
@@ -88,8 +88,9 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 		katapult: client,
 		config:   *c,
 		loadBalancer: &LoadBalancer{
-			config:                 *c,
-			loadBalancerController: client.LoadBalancers,
+			config:                     *c,
+			loadBalancerController:     client.LoadBalancers,
+			loadBalancerRuleController: client.LoadBalancerRules,
 		},
 	}, nil
 }
