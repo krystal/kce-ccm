@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	v1 "k8s.io/api/core/v1"
@@ -42,6 +43,8 @@ type loadBalancerRuleController interface {
 }
 
 type LoadBalancer struct {
+	log logr.Logger
+
 	config                     Config
 	loadBalancerController     loadBalancerController
 	loadBalancerRuleController loadBalancerRuleController

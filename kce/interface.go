@@ -3,12 +3,13 @@ package kce
 import (
 	"context"
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	"github.com/sethvargo/go-envconfig"
 	"io"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	"net/url"
 )
 
@@ -60,6 +61,7 @@ func loadConfig(lookuper envconfig.Lookuper) (*Config, error) {
 // k8s CCM provides us with an io.Reader which can be used to read a config
 // file.
 func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
+	log := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
 	c, err := loadConfig(envconfig.OsLookuper())
 	if err != nil {
 		return nil, err
@@ -67,7 +69,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 
 	apiUrl := katapult.DefaultURL
 	if c.APIHost != "" {
-		klog.InfoS("default API base URL overrided", "url", c.APIHost)
+		log.Info("default API base URL overrided", "url", c.APIHost)
 		apiUrl, err = url.Parse(c.APIHost)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse provided api url: %w", err)
@@ -85,9 +87,11 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 	client := core.New(rm)
 
 	return &provider{
+		log:      log,
 		katapult: client,
 		config:   *c,
 		loadBalancer: &LoadBalancer{
+			log:                        log,
 			config:                     *c,
 			loadBalancerController:     client.LoadBalancers,
 			loadBalancerRuleController: client.LoadBalancerRules,
@@ -96,6 +100,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 }
 
 type provider struct {
+	log          logr.Logger
 	katapult     *core.Client
 	config       Config
 	loadBalancer *LoadBalancer
