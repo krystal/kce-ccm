@@ -110,7 +110,7 @@ func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilde
 	// TODO: Assess if we actually need anything here
 }
 
-// loadBalancerManager returns our implementation of the loadBalancerManager provider
+// LoadBalancer returns our implementation of the loadBalancerManager provider
 func (p *provider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return p.loadBalancer, true
 }

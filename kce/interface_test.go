@@ -2,6 +2,7 @@ package kce
 
 import (
 	"github.com/krystal/go-katapult/core"
+	"github.com/sethvargo/go-envconfig"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -20,6 +21,73 @@ func TestConfig_dcRef(t *testing.T) {
 	}
 
 	assert.Equal(t, &core.DataCenter{ID: "atlantis-central-1"}, c.dcRef())
+}
+
+func Test_loadConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		lookuper envconfig.Lookuper
+		wantErr  string
+		want     *Config
+	}{
+		{
+			name: "success",
+			lookuper: envconfig.MapLookuper(map[string]string{
+				"KATAPULT_API_TOKEN":        "atoken",
+				"KATAPULT_API_HOST":         "api.katapult.org",
+				"KATAPULT_ORGANIZATION_RID": "fake-org",
+				"KATAPULT_DATA_CENTER_RID":  "atlantis",
+			}),
+			want: &Config{
+				APIHost:        "api.katapult.org",
+				APIKey:         "atoken",
+				OrganizationID: "fake-org",
+				DataCenterID:   "atlantis",
+			},
+		},
+		{
+			name:     "underlying err propagates",
+			lookuper: nil,
+			wantErr:  "lookuper cannot be nil",
+		},
+		{
+			name: "api key missing causes error",
+			lookuper: envconfig.MapLookuper(map[string]string{
+				"KATAPULT_ORGANIZATION_RID": "fake-org",
+				"KATAPULT_DATA_CENTER_RID":  "atlantis",
+			}),
+			wantErr: "api key is not configured",
+		},
+		{
+			name: "org ID missing causes error",
+			lookuper: envconfig.MapLookuper(map[string]string{
+				"KATAPULT_API_TOKEN":       "atoken",
+				"KATAPULT_DATA_CENTER_RID": "atlantis",
+			}),
+			wantErr: "organization id is not set",
+		},
+		{
+			name: "dc ID missing causes error",
+			lookuper: envconfig.MapLookuper(map[string]string{
+				"KATAPULT_API_TOKEN":        "atoken",
+				"KATAPULT_ORGANIZATION_RID": "fake-org",
+			}),
+			wantErr: "data center id is not set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := loadConfig(tt.lookuper)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, c)
+		})
+	}
 }
 
 func TestProvider_LoadBalancer(t *testing.T) {
