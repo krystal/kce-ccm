@@ -11,14 +11,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// LoadBalancer is an abstract, pluggable interface for load balancers.
+// loadBalancerManager is an abstract, pluggable interface for load balancers.
 //
 // Cloud provider may chose to implement the logic for
 // constructing/destroying specific kinds of load balancers in a
 // controller separate from the ServiceController.  If this is the case,
-// then {Ensure,Update}LoadBalancer must return the ImplementedElsewhere error.
+// then {Ensure,Update}loadBalancerManager must return the ImplementedElsewhere error.
 // For the given LB service, the GetLoadBalancer must return "exists=True" if
-// there exists a LoadBalancer instance created by ServiceController.
+// there exists a loadBalancerManager instance created by ServiceController.
 // In all other cases, GetLoadBalancer must return a NotFound error.
 // EnsureLoadBalancerDeleted must not return ImplementedElsewhere to ensure
 // proper teardown of resources that were allocated by the ServiceController.
@@ -42,7 +42,7 @@ type loadBalancerRuleController interface {
 	Create(ctx context.Context, org *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
 }
 
-type LoadBalancer struct {
+type loadBalancerManager struct {
 	log logr.Logger
 
 	config                     Config
@@ -52,12 +52,47 @@ type LoadBalancer struct {
 
 var lbNotFound = fmt.Errorf("lb not found")
 
+// listLoadBalancers fetches all LBs for the associated org, paging where necessary
+func (lbm *loadBalancerManager) listLoadBalancers(ctx context.Context) ([]*core.LoadBalancer, error) {
+	list, resp, err := lbm.loadBalancerController.List(ctx, lbm.config.orgRef(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for page := 2; page <= resp.Pagination.TotalPages; page++ {
+		more, _, err := lbm.loadBalancerController.List(ctx, lbm.config.orgRef(), &core.ListOptions{Page: page})
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, more...)
+	}
+
+	return list, err
+}
+
+// listLoadBalancerRules fetches all LBRs for an LB, paging where necessary
+func (lbm *loadBalancerManager) listLoadBalancerRules(ctx context.Context, lb *core.LoadBalancer) ([]core.LoadBalancerRule, error) {
+	list, resp, err := lbm.loadBalancerRuleController.List(ctx, lb, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for page := 2; page <= resp.Pagination.TotalPages; page++ {
+		more, _, err := lbm.loadBalancerRuleController.List(ctx, lb, &core.ListOptions{Page: page})
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, more...)
+	}
+
+	return list, err
+}
+
 // getLoadBalancer lists all load balancers for an organisation and attemots to
 // find a specific load balancer. This will eventually be replaced with a
 // bespoke API field to avoid this.
-func (lb *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
-	list, _, err := lb.loadBalancerController.List(ctx, lb.config.orgRef(), &core.ListOptions{PerPage: 100})
-	// TODO: pagination
+func (lbm *loadBalancerManager) getLoadBalancer(ctx context.Context, name string) (*core.LoadBalancer, error) {
+	list, err := lbm.listLoadBalancers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +117,8 @@ func loadBalancerName(clusterName string, service *v1.Service) string {
 // if so, what its status is.
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	foundLb, err := lb.getLoadBalancer(ctx, loadBalancerName(clusterName, service))
+func (lbm *loadBalancerManager) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
+	foundLb, err := lbm.getLoadBalancer(ctx, loadBalancerName(clusterName, service))
 	if err != nil {
 		if err == lbNotFound {
 			return nil, false, nil
@@ -103,15 +138,14 @@ func (lb *LoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string,
 
 // GetLoadBalancerName returns the name of the load balancer. Implementations
 // must treat the *v1.Service parameter as read-only and not modify it.
-func (lb *LoadBalancer) GetLoadBalancerName(_ context.Context, clusterName string, service *v1.Service) string {
+func (lbm *loadBalancerManager) GetLoadBalancerName(_ context.Context, clusterName string, service *v1.Service) string {
 	return loadBalancerName(clusterName, service)
 }
 
 // tidyLoadBalancerRules deletes rules that are no longer in use by the service
 // TODO: Instrumentation for number of entities cleaned up
-func (lb *LoadBalancer) tidyLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
-	rules, _, err := lb.loadBalancerRuleController.List(ctx, balancer, nil)
-	// TODO pagination concerns
+func (lbm *loadBalancerManager) tidyLoadBalancerRules(ctx context.Context, service *v1.Service, lb *core.LoadBalancer) error {
+	rules, err := lbm.listLoadBalancerRules(ctx, lb)
 	if err != nil {
 		return err
 	}
@@ -126,7 +160,7 @@ func (lb *LoadBalancer) tidyLoadBalancerRules(ctx context.Context, service *v1.S
 		}
 
 		if !inUse {
-			_, _, err := lb.loadBalancerRuleController.Delete(ctx, &rule)
+			_, _, err := lbm.loadBalancerRuleController.Delete(ctx, &rule)
 			if err != nil {
 				return err
 			}
@@ -139,9 +173,8 @@ func (lb *LoadBalancer) tidyLoadBalancerRules(ctx context.Context, service *v1.S
 // ensureLoadBalancerRules creates or update LB rules to match the ports exposed
 // by a kubernetes service.
 // TODO: Instrumentation for number of entities created etc
-func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, balancer *core.LoadBalancer) error {
-	rules, _, err := lb.loadBalancerRuleController.List(ctx, balancer, nil)
-	// TODO pagination concerns
+func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, lb *core.LoadBalancer) error {
+	rules, err := lbm.listLoadBalancerRules(ctx, lb)
 	if err != nil {
 		return err
 	}
@@ -166,24 +199,24 @@ func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1
 
 		if foundRule == nil {
 			klog.InfoS("creating lb rule",
-				"lbId", balancer.ID,
+				"lbId", lb.ID,
 				"serviceId", service.UID,
 				"servicePort", servicePort.Port,
 			)
-			_, _, err := lb.loadBalancerRuleController.Create(ctx, balancer, lbRuleArgs)
+			_, _, err := lbm.loadBalancerRuleController.Create(ctx, lb, lbRuleArgs)
 
 			if err != nil {
 				return err
 			}
 		} else {
 			klog.InfoS("updating lb rule",
-				"lbId", balancer.ID,
+				"lbId", lb.ID,
 				"ruleId", foundRule.ID,
 				"serviceId", service.UID,
 				"servicePort", servicePort.Port,
 			)
 			// TODO: Matcher to avoid unnecessary updates
-			_, _, err := lb.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
+			_, _, err := lbm.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
 			if err != nil {
 				return err
 			}
@@ -197,39 +230,39 @@ func (lb *LoadBalancer) ensureLoadBalancerRules(ctx context.Context, service *v1
 // Implementations must treat the *v1.Service and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	name := loadBalancerName(clusterName, service)
-	balancer, err := lb.getLoadBalancer(ctx, name)
+	lb, err := lbm.getLoadBalancer(ctx, name)
 	if err != nil && err != lbNotFound {
 		return nil, err
 	}
 
 	// If load balancer doesn't exist create it
-	if balancer == nil {
-		balancer, _, err = lb.loadBalancerController.Create(ctx, lb.config.orgRef(), &core.LoadBalancerCreateArguments{
+	if lb == nil {
+		lb, _, err = lbm.loadBalancerController.Create(ctx, lbm.config.orgRef(), &core.LoadBalancerCreateArguments{
 			Name:       name,
-			DataCenter: lb.config.dcRef(),
+			DataCenter: lbm.config.dcRef(),
 		})
 		if err != nil {
 			return nil, err
 		}
 	}
 	// If it already exists, there's not many fields we need to update
-	// We do need to update the associated LoadBalancer rules though.
+	// We do need to update the associated loadBalancerManager rules though.
 
-	err = lb.ensureLoadBalancerRules(ctx, service, balancer)
+	err = lbm.ensureLoadBalancerRules(ctx, service, lb)
 	if err != nil {
 		return nil, err
 	}
 
-	err = lb.tidyLoadBalancerRules(ctx, service, balancer)
+	err = lbm.tidyLoadBalancerRules(ctx, service, lb)
 	if err != nil {
 		return nil, err
 	}
 
 	return &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
 		{
-			IP: balancer.IPAddress.Address,
+			IP: lb.IPAddress.Address,
 		},
 	}}, nil
 }
@@ -238,7 +271,7 @@ func (lb *LoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName stri
 // Implementations must treat the *v1.Service and *v1.Node
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (lb *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+func (lbm *loadBalancerManager) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	// This will probably not do much. We will implement load balancers that target the group/tag of nodes rather than specified nodes.
 	return errors.New("UpdateLoadBalancer not implemented")
 }
@@ -251,9 +284,9 @@ func (lb *LoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName stri
 // doesn't exist even if some part of it is still laying around.
 // Implementations must treat the *v1.Service parameter as read-only and not modify it.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-func (lb *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+func (lbm *loadBalancerManager) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	name := loadBalancerName(clusterName, service)
-	balancer, err := lb.getLoadBalancer(ctx, name)
+	balancer, err := lbm.getLoadBalancer(ctx, name)
 	if err != nil {
 		if err == lbNotFound { // If it doesn't exist, good!
 			return nil
@@ -261,6 +294,6 @@ func (lb *LoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterNa
 		return err
 	}
 
-	_, _, err = lb.loadBalancerController.Delete(ctx, balancer)
+	_, _, err = lbm.loadBalancerController.Delete(ctx, balancer)
 	return err
 }

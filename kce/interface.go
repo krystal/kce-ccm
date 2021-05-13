@@ -90,7 +90,7 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 		log:      log,
 		katapult: client,
 		config:   *c,
-		loadBalancer: &LoadBalancer{
+		loadBalancer: &loadBalancerManager{
 			log:                        log,
 			config:                     *c,
 			loadBalancerController:     client.LoadBalancers,
@@ -103,14 +103,14 @@ type provider struct {
 	log          logr.Logger
 	katapult     *core.Client
 	config       Config
-	loadBalancer *LoadBalancer
+	loadBalancer *loadBalancerManager
 }
 
 func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	// TODO: Assess if we actually need anything here
 }
 
-// LoadBalancer returns our implementation of the LoadBalancer provider
+// loadBalancerManager returns our implementation of the loadBalancerManager provider
 func (p *provider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return p.loadBalancer, true
 }
