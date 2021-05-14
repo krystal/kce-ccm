@@ -69,7 +69,8 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 
 	apiUrl := katapult.DefaultURL
 	if c.APIHost != "" {
-		log.Info("default API base URL overrided", "url", c.APIHost)
+		log.Info("default API base URL overrided",
+			"url", c.APIHost)
 		apiUrl, err = url.Parse(c.APIHost)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse provided api url: %w", err)
@@ -106,7 +107,9 @@ type provider struct {
 	loadBalancer *loadBalancerManager
 }
 
-func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (p *provider) Initialize(
+	clientBuilder cloudprovider.ControllerClientBuilder,
+	stop <-chan struct{}) {
 	// TODO: Assess if we actually need anything here
 }
 

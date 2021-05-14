@@ -2,11 +2,238 @@ package kce
 
 import (
 	"context"
+	"fmt"
+	"github.com/krystal/go-katapult"
+	"github.com/krystal/go-katapult/core"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math"
 	"testing"
 )
+
+type mockLBController struct {
+	items []core.LoadBalancer
+}
+
+func (lbc *mockLBController) List(_ context.Context, _ *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error) {
+	perPage := 2
+	page := 1
+	if opts != nil {
+		if opts.PerPage != 0 {
+			perPage = opts.PerPage
+		}
+		if opts.Page != 0 {
+			page = opts.Page
+		}
+	}
+
+	pagedOut := make([]*core.LoadBalancer, 0)
+	start := (page - 1) * perPage
+	end := page * perPage
+	if end > len(lbc.items) {
+		end = len(lbc.items)
+	}
+	for i := start; i < end; i++ {
+		copyOfItem := lbc.items[i]
+		if copyOfItem.ID == "error" {
+			return nil, nil, fmt.Errorf("error from %d", i)
+		}
+		pagedOut = append(pagedOut, &copyOfItem)
+	}
+
+	return pagedOut, &katapult.Response{
+		Pagination: &katapult.Pagination{
+			CurrentPage: page,
+			PerPage:     perPage,
+			TotalPages:  int(math.Ceil(float64(len(lbc.items)) / float64(perPage))),
+			Total:       len(lbc.items),
+		},
+	}, nil
+}
+
+func (lbc *mockLBController) Delete(ctx context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+func (lbc *mockLBController) Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+func (lbc *mockLBController) Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+type mockLBRController struct {
+	items []core.LoadBalancerRule
+}
+
+func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error) {
+	perPage := 2
+	page := 1
+	if opts != nil {
+		if opts.PerPage != 0 {
+			perPage = opts.PerPage
+		}
+		if opts.Page != 0 {
+			page = opts.Page
+		}
+	}
+
+	pagedOut := make([]core.LoadBalancerRule, 0)
+	start := (page - 1) * perPage
+	end := page * perPage
+	if end > len(lbr.items) {
+		end = len(lbr.items)
+	}
+	for i := start; i < end; i++ {
+		if lbr.items[i].ID == "error" {
+			return nil, nil, fmt.Errorf("error from %d", i)
+		}
+		pagedOut = append(pagedOut, lbr.items[i])
+	}
+
+	return pagedOut, &katapult.Response{
+		Pagination: &katapult.Pagination{
+			CurrentPage: page,
+			PerPage:     perPage,
+			TotalPages:  int(math.Ceil(float64(len(lbr.items)) / float64(perPage))),
+			Total:       len(lbr.items),
+		},
+	}, nil
+}
+
+func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+func (lbrc *mockLBRController) Create(ctx context.Context, lb *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+	return nil, nil, nil
+}
+
+func TestLoadBalancerManager_listLoadBalancers(t *testing.T) {
+	tests := []struct {
+		name string
+
+		seedData []core.LoadBalancer
+
+		want    []*core.LoadBalancer
+		wantErr string
+	}{
+		{
+			name: "success",
+			seedData: []core.LoadBalancer{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "789"},
+				{ID: "abc"},
+				{ID: "def"},
+			},
+			want: []*core.LoadBalancer{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "789"},
+				{ID: "abc"},
+				{ID: "def"},
+			},
+		},
+		{
+			name: "immediate error",
+			seedData: []core.LoadBalancer{
+				{ID: "error"},
+			},
+			wantErr: "error from 0",
+		},
+		{
+			name: "error in batch",
+			seedData: []core.LoadBalancer{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "error"},
+			},
+			wantErr: "error from 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBController{items: tt.seedData}
+			lbm := loadBalancerManager{loadBalancerController: lbc}
+
+			got, err := lbm.listLoadBalancers(context.TODO())
+			assert.Equal(t, tt.want, got)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadBalancerManager_listLoadBalancerRules(t *testing.T) {
+	tests := []struct {
+		name string
+
+		seedData []core.LoadBalancerRule
+
+		want    []core.LoadBalancerRule
+		wantErr string
+	}{
+		{
+			name: "success",
+			seedData: []core.LoadBalancerRule{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "789"},
+				{ID: "abc"},
+				{ID: "def"},
+			},
+			want: []core.LoadBalancerRule{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "789"},
+				{ID: "abc"},
+				{ID: "def"},
+			},
+		},
+		{
+			name: "immediate error",
+			seedData: []core.LoadBalancerRule{
+				{ID: "error"},
+			},
+			wantErr: "error from 0",
+		},
+		{
+			name: "error in batch",
+			seedData: []core.LoadBalancerRule{
+				{ID: "123"},
+				{ID: "456"},
+				{ID: "error"},
+			},
+			wantErr: "error from 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbrc := &mockLBRController{items: tt.seedData}
+			lbm := loadBalancerManager{loadBalancerRuleController: lbrc}
+
+			got, err := lbm.listLoadBalancerRules(context.TODO(), &core.LoadBalancer{})
+			assert.Equal(t, tt.want, got)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 	lbm := loadBalancerManager{}
