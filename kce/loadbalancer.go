@@ -240,8 +240,10 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 	// If load balancer doesn't exist create it
 	if lb == nil {
 		lb, _, err = lbm.loadBalancerController.Create(ctx, lbm.config.orgRef(), &core.LoadBalancerCreateArguments{
-			Name:       name,
-			DataCenter: lbm.config.dcRef(),
+			Name:         name,
+			DataCenter:   lbm.config.dcRef(),
+			ResourceType: core.TagsResourceType,
+			ResourceIDs:  &[]string{lbm.config.NodeTagID}, // TODO: remove once replaced with UpdateLoadBalancer host mechanism
 		})
 		if err != nil {
 			return nil, err

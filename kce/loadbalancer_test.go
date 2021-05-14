@@ -52,15 +52,24 @@ func (lbc *mockLBController) List(_ context.Context, _ *core.Organization, opts 
 	}, nil
 }
 
-func (lbc *mockLBController) Delete(ctx context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error) {
-	return nil, nil, nil
+func (lbc *mockLBController) Delete(_ context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error) {
+	for i, item := range lbc.items {
+		if item.ID == lb.ID {
+			lbc.items = append(lbc.items[:i], lbc.items[i+1:]...)
+			return &item, &katapult.Response{}, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("tried to delete non-existent element")
 }
 
 func (lbc *mockLBController) Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+	panic("unimplemented")
 	return nil, nil, nil
 }
 
 func (lbc *mockLBController) Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+	panic("unimplemented")
 	return nil, nil, nil
 }
 
@@ -104,14 +113,17 @@ func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts
 }
 
 func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error) {
+	panic("unimplemented")
 	return nil, nil, nil
 }
 
 func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+	panic("unimplemented")
 	return nil, nil, nil
 }
 
 func (lbrc *mockLBRController) Create(ctx context.Context, lb *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+	panic("unimplemented")
 	return nil, nil, nil
 }
 
@@ -387,4 +399,77 @@ func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 	want := "k8s-big-bad-cluster-b5216b07-2cb4-4429-8294-23883301a01e"
 
 	assert.Equal(t, want, got)
+}
+
+func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
+	tests := []struct {
+		name string
+
+		loadBalancers []core.LoadBalancer
+
+		clusterName string
+		service     *v1.Service
+
+		wantLoadBalancers []core.LoadBalancer
+
+		wantErr string
+	}{
+		{
+			name: "deletes",
+			loadBalancers: []core.LoadBalancer{
+				{
+					Name:      "k8s-test-b5216b07-2cb4-4429-8294-23883301a01e",
+					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
+				},
+			},
+			clusterName: "test",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+
+			wantLoadBalancers: []core.LoadBalancer{},
+		},
+		{
+			name:          "handles non existent",
+			loadBalancers: []core.LoadBalancer{},
+			clusterName:   "test",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+			wantLoadBalancers: []core.LoadBalancer{},
+		},
+		{
+			name:        "propagates error",
+			clusterName: "test",
+			loadBalancers: []core.LoadBalancer{
+				{
+					ID: "error",
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+			wantLoadBalancers: []core.LoadBalancer{
+				{
+					ID: "error",
+				},
+			},
+			wantErr: "error from 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBController{items: tt.loadBalancers}
+			lbm := loadBalancerManager{loadBalancerController: lbc}
+
+			err := lbm.EnsureLoadBalancerDeleted(context.TODO(), tt.clusterName, tt.service)
+			assert.Equal(t, tt.wantLoadBalancers, lbc.items)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
 }

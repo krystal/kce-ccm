@@ -19,6 +19,8 @@ type Config struct {
 
 	OrganizationID string `env:"KATAPULT_ORGANIZATION_RID"`
 	DataCenterID   string `env:"KATAPULT_DATA_CENTER_RID"`
+
+	NodeTagID string `env:"KATAPULT_NODE_TAG_ID"` // TODO: remove, termpoary.
 }
 
 func (c Config) orgRef() *core.Organization {
