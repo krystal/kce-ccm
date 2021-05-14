@@ -272,7 +272,7 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lbm *loadBalancerManager) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	// This will probably not do much. We will implement load balancers that target the group/tag of nodes rather than specified nodes.
+	// TODO: Update LB with nodes
 	return errors.New("UpdateLoadBalancer not implemented")
 }
 

@@ -235,6 +235,142 @@ func TestLoadBalancerManager_listLoadBalancerRules(t *testing.T) {
 	}
 }
 
+func TestLoadBalancerManager_getLoadBalancer(t *testing.T) {
+	tests := []struct {
+		name          string
+		loadBalancers []core.LoadBalancer
+
+		wantName string
+
+		want    *core.LoadBalancer
+		wantErr string
+	}{
+		{
+			name: "success",
+			loadBalancers: []core.LoadBalancer{
+				{
+					Name: "woo",
+					ID:   "lb_dkhVsHN8s8OpEeM9",
+				},
+			},
+			wantName: "woo",
+			want: &core.LoadBalancer{
+				Name: "woo",
+				ID:   "lb_dkhVsHN8s8OpEeM9",
+			},
+		},
+		{
+			name: "not found",
+			loadBalancers: []core.LoadBalancer{
+				{
+					Name: "woo",
+					ID:   "lb_dkhVsHN8s8OpEeM9",
+				},
+			},
+			wantName: "idontexist",
+			wantErr:  lbNotFound.Error(),
+		},
+		{
+			name: "err propagates",
+			loadBalancers: []core.LoadBalancer{
+				{
+					ID: "error",
+				},
+			},
+			wantName: "woo",
+			wantErr:  "error from 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBController{items: tt.loadBalancers}
+			lbm := loadBalancerManager{loadBalancerController: lbc}
+
+			lb, err := lbm.getLoadBalancer(context.TODO(), tt.wantName)
+			assert.Equal(t, tt.want, lb)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
+	tests := []struct {
+		name string
+
+		loadBalancers []core.LoadBalancer
+
+		clusterName string
+		service     *v1.Service
+
+		wantStatus *v1.LoadBalancerStatus
+		wantExists bool
+		wantErr    string
+	}{
+		{
+			name: "exists",
+			loadBalancers: []core.LoadBalancer{
+				{
+					Name:      "k8s-test-b5216b07-2cb4-4429-8294-23883301a01e",
+					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
+				},
+			},
+			clusterName: "test",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
+				{
+					IP: "10.0.0.1",
+				},
+			}},
+			wantExists: true,
+		},
+		{
+			name:        "nonexistent",
+			clusterName: "test",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+			wantExists: false,
+		},
+		{
+			name:        "error",
+			clusterName: "test",
+			loadBalancers: []core.LoadBalancer{
+				{
+					ID: "error",
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+			},
+			wantExists: false,
+			wantErr:    "error from 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBController{items: tt.loadBalancers}
+			lbm := loadBalancerManager{loadBalancerController: lbc}
+
+			gotStatus, gotExists, gotErr := lbm.GetLoadBalancer(context.TODO(), tt.clusterName, tt.service)
+			assert.Equal(t, tt.wantStatus, gotStatus)
+			assert.Equal(t, tt.wantExists, gotExists)
+			if tt.wantErr == "" {
+				assert.NoError(t, gotErr)
+			} else {
+				assert.EqualError(t, gotErr, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 	lbm := loadBalancerManager{}
 
