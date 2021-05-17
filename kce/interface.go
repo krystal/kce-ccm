@@ -3,28 +3,42 @@ package kce
 import (
 	"context"
 	"fmt"
+	"github.com/go-logr/logr"
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	"github.com/sethvargo/go-envconfig"
 	"io"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	"net/url"
 )
 
 type Config struct {
 	APIKey  string `env:"KATAPULT_API_TOKEN"`
 	APIHost string `env:"KATAPULT_API_HOST"`
+
+	OrganizationID string `env:"KATAPULT_ORGANIZATION_RID"`
+	DataCenterID   string `env:"KATAPULT_DATA_CENTER_RID"`
+
+	NodeTagID string `env:"KATAPULT_NODE_TAG_ID"` // TODO: remove, termpoary.
 }
 
-// providerFactory creates any dependencies needed by the provider and passes
-// them into New. For now, we will source config from the environment, but we
-// k8s CCM provides us with an io.Reader which can be used to read a config
-// file.
-func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
+func (c Config) orgRef() *core.Organization {
+	return &core.Organization{
+		ID: c.OrganizationID,
+	}
+}
+
+func (c Config) dcRef() *core.DataCenter {
+	return &core.DataCenter{
+		ID: c.DataCenterID,
+	}
+}
+
+func loadConfig(lookuper envconfig.Lookuper) (*Config, error) {
 	c := Config{}
 
-	err := envconfig.Process(context.TODO(), &c)
+	err := envconfig.ProcessWith(context.TODO(), &c, lookuper)
 	if err != nil {
 		return nil, err
 	}
@@ -33,16 +47,39 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("api key is not configured")
 	}
 
+	if c.OrganizationID == "" {
+		return nil, fmt.Errorf("organization id is not set")
+	}
+
+	if c.DataCenterID == "" {
+		return nil, fmt.Errorf("data center id is not set")
+	}
+
+	return &c, nil
+}
+
+// providerFactory creates any dependencies needed by the provider and passes
+// them into New. For now, we will source config from the environment, but we
+// k8s CCM provides us with an io.Reader which can be used to read a config
+// file.
+func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
+	log := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
+	c, err := loadConfig(envconfig.OsLookuper())
+	if err != nil {
+		return nil, err
+	}
+
 	apiUrl := katapult.DefaultURL
 	if c.APIHost != "" {
-		klog.Info("default API base URL overrided", "url", c.APIHost)
+		log.Info("default API base URL overrided",
+			"url", c.APIHost)
 		apiUrl, err = url.Parse(c.APIHost)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse provided api url: %w", err)
 		}
 	}
 
-	client, err := katapult.New(
+	rm, err := katapult.New(
 		katapult.WithAPIKey(c.APIKey),
 		katapult.WithBaseURL(apiUrl),
 		katapult.WithUserAgent("kce-ccm"), // TODO: Add version.
@@ -50,31 +87,35 @@ func providerFactory(_ io.Reader) (cloudprovider.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	client := core.New(rm)
 
-	return New(c, core.New(client))
-}
-
-// New returns a new provider using the provided dependencies.
-func New(c Config, client *core.Client) (cloudprovider.Interface, error) {
-	// TODO: Interface for client rather than concrete type <3
 	return &provider{
-		katapult:     client,
-		config:       c,
-		loadBalancer: &LoadBalancer{},
+		log:      log,
+		katapult: client,
+		config:   *c,
+		loadBalancer: &loadBalancerManager{
+			log:                        log,
+			config:                     *c,
+			loadBalancerController:     client.LoadBalancers,
+			loadBalancerRuleController: client.LoadBalancerRules,
+		},
 	}, nil
 }
 
 type provider struct {
+	log          logr.Logger
 	katapult     *core.Client
 	config       Config
-	loadBalancer *LoadBalancer
+	loadBalancer *loadBalancerManager
 }
 
-func (p *provider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (p *provider) Initialize(
+	clientBuilder cloudprovider.ControllerClientBuilder,
+	stop <-chan struct{}) {
 	// TODO: Assess if we actually need anything here
 }
 
-// LoadBalancer returns our implementation of the LoadBalancer provider
+// LoadBalancer returns our implementation of the loadBalancerManager provider
 func (p *provider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return p.loadBalancer, true
 }
