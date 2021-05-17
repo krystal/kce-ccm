@@ -229,6 +229,11 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 				"servicePortName", servicePort.Name,
 				"servicePortTarget", servicePort.TargetPort,
 			)
+			lbm.log.V(4).Info("updating lb rule",
+				"loadBalancerId", lb.ID,
+				"ruleId", foundRule.ID,
+				"args", lbRuleArgs,
+			)
 			// TODO: Matcher to avoid unnecessary updates
 			_, _, err := lbm.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
 			if err != nil {

@@ -3,6 +3,7 @@ package kce
 import (
 	"context"
 	"fmt"
+	logTest "github.com/go-logr/logr/testing"
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	"github.com/stretchr/testify/assert"
@@ -176,7 +177,10 @@ func TestLoadBalancerManager_listLoadBalancers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbc := &mockLBController{items: tt.seedData}
-			lbm := loadBalancerManager{loadBalancerController: lbc}
+			lbm := loadBalancerManager{
+				loadBalancerController: lbc,
+				log:                    logTest.TestLogger{T: t},
+			}
 
 			got, err := lbm.listLoadBalancers(context.TODO())
 			assert.Equal(t, tt.want, got)
@@ -236,7 +240,10 @@ func TestLoadBalancerManager_listLoadBalancerRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbrc := &mockLBRController{items: tt.seedData}
-			lbm := loadBalancerManager{loadBalancerRuleController: lbrc}
+			lbm := loadBalancerManager{
+				loadBalancerRuleController: lbrc,
+				log:                        logTest.TestLogger{T: t},
+			}
 
 			got, err := lbm.listLoadBalancerRules(context.TODO(), &core.LoadBalancer{})
 			assert.Equal(t, tt.want, got)
@@ -299,7 +306,10 @@ func TestLoadBalancerManager_getLoadBalancer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbc := &mockLBController{items: tt.loadBalancers}
-			lbm := loadBalancerManager{loadBalancerController: lbc}
+			lbm := loadBalancerManager{
+				loadBalancerController: lbc,
+				log:                    logTest.TestLogger{T: t},
+			}
 
 			lb, err := lbm.getLoadBalancer(context.TODO(), tt.wantName)
 			assert.Equal(t, tt.want, lb)
@@ -371,7 +381,10 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbc := &mockLBController{items: tt.loadBalancers}
-			lbm := loadBalancerManager{loadBalancerController: lbc}
+			lbm := loadBalancerManager{
+				loadBalancerController: lbc,
+				log:                    logTest.TestLogger{T: t},
+			}
 
 			gotStatus, gotExists, gotErr := lbm.GetLoadBalancer(context.TODO(), tt.clusterName, tt.service)
 			assert.Equal(t, tt.wantStatus, gotStatus)
@@ -463,7 +476,10 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbc := &mockLBController{items: tt.loadBalancers}
-			lbm := loadBalancerManager{loadBalancerController: lbc}
+			lbm := loadBalancerManager{
+				loadBalancerController: lbc,
+				log:                    logTest.TestLogger{T: t},
+			}
 
 			err := lbm.EnsureLoadBalancerDeleted(context.TODO(), tt.clusterName, tt.service)
 			assert.Equal(t, tt.wantLoadBalancers, lbc.items)
@@ -524,7 +540,10 @@ func TestLoadBalancerManager_tidyLoadBalancerRules(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lbc := &mockLBRController{items: tt.loadBalancerRules}
-			lbm := loadBalancerManager{loadBalancerRuleController: lbc}
+			lbm := loadBalancerManager{
+				loadBalancerRuleController: lbc,
+				log:                        logTest.TestLogger{T: t},
+			}
 
 			err := lbm.tidyLoadBalancerRules(context.TODO(), tt.service, tt.loadBalancer)
 			assert.Equal(t, tt.wantLoadBalancerRules, lbc.items)
