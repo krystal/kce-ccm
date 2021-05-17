@@ -189,12 +189,19 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 		}
 
 		proxyProtocol := false
+		checkEnabled := true
 		lbRuleArgs := core.LoadBalancerRuleArguments{
 			Algorithm:       core.RoundRobinRuleAlgorithm,
 			DestinationPort: int(servicePort.NodePort),
 			ListenPort:      int(servicePort.Port),
 			Protocol:        core.TCPProtocol,
 			ProxyProtocol:   &proxyProtocol,
+			CheckEnabled:    &checkEnabled,
+			CheckProtocol:   core.TCPProtocol,
+			CheckTimeout:    5,
+			CheckInterval:   10,
+			CheckRise:       1,
+			CheckFall:       1,
 		}
 
 		if foundRule == nil {
