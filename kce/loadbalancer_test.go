@@ -113,8 +113,14 @@ func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts
 }
 
 func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error) {
-	panic("unimplemented")
-	return nil, nil, nil
+	for i, item := range lbrc.items {
+		if item.ID == lbr.ID {
+			lbrc.items = append(lbrc.items[:i], lbrc.items[i+1:]...)
+			return &item, &katapult.Response{}, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("tried to delete non-existent element")
 }
 
 func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
@@ -465,6 +471,67 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 
 			err := lbm.EnsureLoadBalancerDeleted(context.TODO(), tt.clusterName, tt.service)
 			assert.Equal(t, tt.wantLoadBalancers, lbc.items)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadBalancerManager_tidyLoadBalancerRules(t *testing.T) {
+	// TODO: Cover error cases
+	tests := []struct {
+		name string
+
+		loadBalancerRules []core.LoadBalancerRule
+		loadBalancer      *core.LoadBalancer
+
+		service *v1.Service
+
+		wantLoadBalancerRules []core.LoadBalancerRule
+
+		wantErr string
+	}{
+		{
+			name: "correctly handles two rules",
+			loadBalancerRules: []core.LoadBalancerRule{
+				{
+					ID:         "willbekept",
+					ListenPort: 133,
+				},
+				{
+					ID:         "willbedeleted",
+					ListenPort: 1337,
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				Spec: v1.ServiceSpec{Ports: []v1.ServicePort{
+					{
+						Port: 133,
+					},
+				}},
+			},
+			loadBalancer: &core.LoadBalancer{},
+
+			wantLoadBalancerRules: []core.LoadBalancerRule{
+				{
+					ID:         "willbekept",
+					ListenPort: 133,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBRController{items: tt.loadBalancerRules}
+			lbm := loadBalancerManager{loadBalancerRuleController: lbc}
+
+			err := lbm.tidyLoadBalancerRules(context.TODO(), tt.service, tt.loadBalancer)
+			assert.Equal(t, tt.wantLoadBalancerRules, lbc.items)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)
 			} else {
