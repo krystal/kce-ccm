@@ -7,7 +7,6 @@ import (
 	"github.com/krystal/go-katapult"
 	"github.com/krystal/go-katapult/core"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 )
 
 // loadBalancerManager is an abstract, pluggable interface for load balancers.
@@ -159,6 +158,12 @@ func (lbm *loadBalancerManager) tidyLoadBalancerRules(ctx context.Context, servi
 		}
 
 		if !inUse {
+			lbm.log.Info("deleting unused lb rule",
+				"loadBalancerId", lb.ID,
+				"serviceId", service.UID,
+				"ruleId", rule.ID,
+				"rulePort", rule.ListenPort,
+			)
 			_, _, err := lbm.loadBalancerRuleController.Delete(ctx, &rule)
 			if err != nil {
 				return err
@@ -204,21 +209,25 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 		}
 
 		if foundRule == nil {
-			klog.InfoS("creating lb rule",
-				"lbId", lb.ID,
+			lbm.log.Info("creating lb rule",
+				"loadBalancerId", lb.ID,
 				"serviceId", service.UID,
 				"servicePort", servicePort.Port,
+				"servicePortName", servicePort.Name,
+				"servicePortTarget", servicePort.TargetPort,
 			)
 			_, _, err := lbm.loadBalancerRuleController.Create(ctx, lb, lbRuleArgs)
 			if err != nil {
 				return err
 			}
 		} else {
-			klog.InfoS("updating lb rule",
-				"lbId", lb.ID,
+			lbm.log.Info("updating lb rule",
+				"loadBalancerId", lb.ID,
 				"ruleId", foundRule.ID,
 				"serviceId", service.UID,
 				"servicePort", servicePort.Port,
+				"servicePortName", servicePort.Name,
+				"servicePortTarget", servicePort.TargetPort,
 			)
 			// TODO: Matcher to avoid unnecessary updates
 			_, _, err := lbm.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
@@ -244,6 +253,9 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 
 	// If load balancer doesn't exist create it
 	if lb == nil {
+		lbm.log.Info("creating lb",
+			"serviceId", service.UID,
+		)
 		lb, _, err = lbm.loadBalancerController.Create(ctx, lbm.config.orgRef(), &core.LoadBalancerCreateArguments{
 			Name:         name,
 			DataCenter:   lbm.config.dcRef(),
@@ -253,6 +265,11 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		lbm.log.Info("found existing lb",
+			"serviceId", service.UID,
+			"loadBalancerId", lb.ID,
+		)
 	}
 	// If it already exists, there's not many fields we need to update
 	// We do need to update the associated loadBalancerManager rules though.
