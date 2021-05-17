@@ -2,7 +2,6 @@ package kce
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/krystal/go-katapult"
@@ -211,7 +210,6 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 				"servicePort", servicePort.Port,
 			)
 			_, _, err := lbm.loadBalancerRuleController.Create(ctx, lb, lbRuleArgs)
-
 			if err != nil {
 				return err
 			}
@@ -250,7 +248,7 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 			Name:         name,
 			DataCenter:   lbm.config.dcRef(),
 			ResourceType: core.TagsResourceType,
-			ResourceIDs:  &[]string{lbm.config.NodeTagID}, // TODO: remove once replaced with UpdateLoadBalancer host mechanism
+			ResourceIDs:  &[]string{lbm.config.NodeTagID},
 		})
 		if err != nil {
 			return nil, err
@@ -281,8 +279,8 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 // parameters as read-only and not modify them.
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (lbm *loadBalancerManager) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	// TODO: Update LB with nodes
-	return errors.New("UpdateLoadBalancer not implemented")
+	// TODO: Evaluate if required. For now rely on health checking and tagging of hosts.
+	return nil
 }
 
 // EnsureLoadBalancerDeleted deletes the specified load balancer if it

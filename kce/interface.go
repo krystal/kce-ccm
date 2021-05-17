@@ -20,7 +20,7 @@ type Config struct {
 	OrganizationID string `env:"KATAPULT_ORGANIZATION_RID"`
 	DataCenterID   string `env:"KATAPULT_DATA_CENTER_RID"`
 
-	NodeTagID string `env:"KATAPULT_NODE_TAG_ID"` // TODO: remove, termpoary.
+	NodeTagID string `env:"KATAPULT_NODE_TAG_RID"`
 }
 
 func (c Config) orgRef() *core.Organization {
@@ -53,6 +53,10 @@ func loadConfig(lookuper envconfig.Lookuper) (*Config, error) {
 
 	if c.DataCenterID == "" {
 		return nil, fmt.Errorf("data center id is not set")
+	}
+
+	if c.NodeTagID == "" {
+		return nil, fmt.Errorf("node tag id is not set")
 	}
 
 	return &c, nil
