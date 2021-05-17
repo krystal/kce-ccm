@@ -189,6 +189,7 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 		for _, rule := range rules {
 			if rule.ListenPort == int(servicePort.Port) {
 				foundRule = &rule
+				break
 			}
 		}
 
