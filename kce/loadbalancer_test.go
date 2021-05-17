@@ -64,13 +64,11 @@ func (lbc *mockLBController) Delete(_ context.Context, lb *core.LoadBalancer) (*
 }
 
 func (lbc *mockLBController) Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error) {
-	panic("unimplemented")
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("unimplemented")
 }
 
 func (lbc *mockLBController) Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
-	panic("unimplemented")
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("unimplemented")
 }
 
 type mockLBRController struct {
@@ -124,13 +122,11 @@ func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalance
 }
 
 func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
-	panic("unimplemented")
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("unimplemented")
 }
 
 func (lbrc *mockLBRController) Create(ctx context.Context, lb *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
-	panic("unimplemented")
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("unimplemented")
 }
 
 func TestLoadBalancerManager_listLoadBalancers(t *testing.T) {
