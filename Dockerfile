@@ -24,4 +24,4 @@ RUN addgroup --gid 1000 -S cloud-controller-manager && adduser -S cloud-controll
 COPY --from=builder /workspace/cloud-controller-manager .
 
 USER cloud-controller-manager:cloud-controller-manager
-CMD ["/cloud-controller-manager"]
+ENTRYPOINT ["/cloud-controller-manager"]
