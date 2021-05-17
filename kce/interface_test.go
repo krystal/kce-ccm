@@ -37,12 +37,14 @@ func Test_loadConfig(t *testing.T) {
 				"KATAPULT_API_HOST":         "api.katapult.org",
 				"KATAPULT_ORGANIZATION_RID": "fake-org",
 				"KATAPULT_DATA_CENTER_RID":  "atlantis",
+				"KATAPULT_NODE_TAG_RID":     "example-tag",
 			}),
 			want: &Config{
 				APIHost:        "api.katapult.org",
 				APIKey:         "atoken",
 				OrganizationID: "fake-org",
 				DataCenterID:   "atlantis",
+				NodeTagID:      "example-tag",
 			},
 		},
 		{
@@ -55,6 +57,7 @@ func Test_loadConfig(t *testing.T) {
 			lookuper: envconfig.MapLookuper(map[string]string{
 				"KATAPULT_ORGANIZATION_RID": "fake-org",
 				"KATAPULT_DATA_CENTER_RID":  "atlantis",
+				"KATAPULT_NODE_TAG_RID":     "example-tag",
 			}),
 			wantErr: "api key is not configured",
 		},
@@ -63,6 +66,7 @@ func Test_loadConfig(t *testing.T) {
 			lookuper: envconfig.MapLookuper(map[string]string{
 				"KATAPULT_API_TOKEN":       "atoken",
 				"KATAPULT_DATA_CENTER_RID": "atlantis",
+				"KATAPULT_NODE_TAG_RID":    "example-tag",
 			}),
 			wantErr: "organization id is not set",
 		},
@@ -71,8 +75,18 @@ func Test_loadConfig(t *testing.T) {
 			lookuper: envconfig.MapLookuper(map[string]string{
 				"KATAPULT_API_TOKEN":        "atoken",
 				"KATAPULT_ORGANIZATION_RID": "fake-org",
+				"KATAPULT_NODE_TAG_RID":     "example-tag",
 			}),
 			wantErr: "data center id is not set",
+		},
+		{
+			name: "node tag missing causes error",
+			lookuper: envconfig.MapLookuper(map[string]string{
+				"KATAPULT_API_TOKEN":        "atoken",
+				"KATAPULT_ORGANIZATION_RID": "fake-org",
+				"KATAPULT_DATA_CENTER_RID":  "atlantis",
+			}),
+			wantErr: "node tag id is not set",
 		},
 	}
 

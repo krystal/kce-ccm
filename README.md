@@ -20,4 +20,4 @@ The following environment variables are needed in order to communicate with the 
 * `KATAPULT_API_TOKEN` - the API token to use to authenticate with
 * `KATAPULT_ORGANIZATION_RID` - the organization RID for the cluster
 * `KATAPULT_DATA_CENTER_RID` - the data centre that the cluster is deployed in
-* `KATAPULT_NETWORK_RID` - the network that the cluster is deployed on
+* `KATAPULT_NODE_TAG_RID` - the tag that has been applied to all worker nodes in the cluster
