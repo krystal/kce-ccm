@@ -73,7 +73,8 @@ func (lbc *mockLBController) Create(ctx context.Context, org *core.Organization,
 }
 
 type mockLBRController struct {
-	items []core.LoadBalancerRule
+	createdItems int
+	items        []core.LoadBalancerRule
 }
 
 func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error) {
@@ -122,12 +123,94 @@ func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalance
 	return nil, nil, fmt.Errorf("tried to delete non-existent element")
 }
 
+// mergeString takes the first non zero value string
+func mergeString(a, b string) string {
+	if a != "" {
+		return a
+	}
+
+	return b
+}
+
+// mergeInt returns the first non zero int
+func mergeInt(a, b int) int {
+	if a != 0 {
+		return a
+	}
+
+	return b
+}
+
 func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
-	return nil, nil, fmt.Errorf("unimplemented")
+	updateItem := core.LoadBalancerRule{}
+	updateIndex := -1
+	for i, item := range lbrc.items {
+		if item.ID == rule.ID {
+			updateIndex = i
+			updateItem = item
+		}
+	}
+	if updateIndex == -1 {
+		return nil, nil, fmt.Errorf("non-existent")
+	}
+
+	// merge objects
+	updateItem.Algorithm = core.LoadBalancerRuleAlgorithm(mergeString(string(args.Algorithm), string(updateItem.Algorithm)))
+	updateItem.DestinationPort = mergeInt(args.DestinationPort, updateItem.DestinationPort)
+	updateItem.ListenPort = mergeInt(args.ListenPort, updateItem.ListenPort)
+	updateItem.Protocol = core.Protocol(mergeString(string(args.Protocol), string(updateItem.Protocol)))
+	if args.ProxyProtocol != nil {
+		updateItem.ProxyProtocol = *args.ProxyProtocol
+	}
+	if args.CheckEnabled != nil {
+		updateItem.CheckEnabled = *args.CheckEnabled
+	}
+	updateItem.CheckFall = mergeInt(args.CheckFall, updateItem.CheckFall)
+	updateItem.CheckInterval = mergeInt(args.CheckInterval, updateItem.CheckInterval)
+	updateItem.CheckPath = mergeString(args.CheckPath, updateItem.CheckPath)
+	updateItem.CheckProtocol = core.Protocol(mergeString(string(args.CheckProtocol), string(updateItem.CheckProtocol)))
+	updateItem.CheckRise = mergeInt(args.CheckRise, updateItem.CheckRise)
+	updateItem.CheckTimeout = mergeInt(args.CheckTimeout, updateItem.CheckTimeout)
+	// set
+	lbrc.items[updateIndex] = updateItem
+
+	return &updateItem, &katapult.Response{}, nil
 }
 
 func (lbrc *mockLBRController) Create(ctx context.Context, lb *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
-	return nil, nil, fmt.Errorf("unimplemented")
+	for _, item := range lbrc.items {
+		if item.ListenPort == args.ListenPort {
+			return &item, &katapult.Response{}, fmt.Errorf("already existing listen port")
+		}
+	}
+
+	proxyProtocol := false
+	if args.ProxyProtocol != nil {
+		proxyProtocol = *args.ProxyProtocol
+	}
+	checkEnabled := false
+	if args.CheckEnabled != nil {
+		checkEnabled = *args.CheckEnabled
+	}
+	newItem := core.LoadBalancerRule{
+		ID:              fmt.Sprintf("created-%d", lbrc.createdItems),
+		Algorithm:       args.Algorithm,
+		DestinationPort: args.DestinationPort,
+		ListenPort:      args.ListenPort,
+		Protocol:        args.Protocol,
+		ProxyProtocol:   proxyProtocol,
+		CheckEnabled:    checkEnabled,
+		CheckFall:       args.CheckFall,
+		CheckInterval:   args.CheckInterval,
+		CheckPath:       args.CheckPath,
+		CheckProtocol:   args.CheckProtocol,
+		CheckRise:       args.CheckRise,
+		CheckTimeout:    args.CheckTimeout,
+	}
+	lbrc.items = append(lbrc.items, newItem)
+	lbrc.createdItems++
+
+	return &newItem, &katapult.Response{}, nil
 }
 
 func TestLoadBalancerManager_listLoadBalancers(t *testing.T) {
@@ -554,4 +637,103 @@ func TestLoadBalancerManager_tidyLoadBalancerRules(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadBalancerManager_ensureLoadBalancerRules(t *testing.T) {
+	tests := []struct {
+		name string
+
+		loadBalancerRules []core.LoadBalancerRule
+		loadBalancer      *core.LoadBalancer
+
+		service *v1.Service
+
+		wantLoadBalancerRules []core.LoadBalancerRule
+
+		wantErr string
+	}{
+		{
+			name: "creates and updates",
+			loadBalancerRules: []core.LoadBalancerRule{
+				{
+					ID:              "lbrule_xICEvzBIgsjyHQQv",
+					ListenPort:      144,
+					DestinationPort: 132,
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				Spec: v1.ServiceSpec{Ports: []v1.ServicePort{
+					{
+						Port:     144,
+						NodePort: 1337,
+					},
+					{
+						Port:     256,
+						NodePort: 199,
+					},
+				}},
+			},
+			loadBalancer: &core.LoadBalancer{
+				ID: "lb_npORVDLVrf7MlghA",
+			},
+
+			wantLoadBalancerRules: []core.LoadBalancerRule{
+				{
+					ID:              "lbrule_xICEvzBIgsjyHQQv",
+					Algorithm:       core.RoundRobinRuleAlgorithm,
+					DestinationPort: 1337,
+					ListenPort:      144,
+					Protocol:        core.TCPProtocol,
+					CheckEnabled:    true,
+					CheckFall:       1,
+					CheckInterval:   10,
+					CheckProtocol:   core.TCPProtocol,
+					CheckRise:       1,
+					CheckTimeout:    5,
+				},
+				{
+					ID:              "created-0",
+					Algorithm:       core.RoundRobinRuleAlgorithm,
+					DestinationPort: 199,
+					ListenPort:      256,
+					Protocol:        core.TCPProtocol,
+					CheckEnabled:    true,
+					CheckFall:       1,
+					CheckInterval:   10,
+					CheckProtocol:   core.TCPProtocol,
+					CheckRise:       1,
+					CheckTimeout:    5,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBRController{items: tt.loadBalancerRules}
+			lbm := loadBalancerManager{
+				loadBalancerRuleController: lbc,
+				log:                        logTest.TestLogger{T: t},
+			}
+
+			err := lbm.ensureLoadBalancerRules(context.TODO(), tt.service, tt.loadBalancer)
+			assert.Equal(t, tt.wantLoadBalancerRules, lbc.items)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+func TestLoadBalancerManager_UpdateLoadBalancer(t *testing.T) {
+	assert.Nil(t,
+		(&loadBalancerManager{}).UpdateLoadBalancer(
+			context.TODO(),
+			"",
+			&v1.Service{},
+			[]*v1.Node{},
+		),
+	)
 }
