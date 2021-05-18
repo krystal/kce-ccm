@@ -1,5 +1,7 @@
 # KCE Cloud Controller Manager
 
+[![Test Coverage](https://api.codeclimate.com/v1/badges/464449b5a40461b8072a/test_coverage)](https://codeclimate.com/github/krystal/kce-ccm/test_coverage)
+
 The Katapult Container Engine Cloud Controller Manager is a set of tools that is designed to monitor nodes & provision load balancers.
 
 This is still a work in progress.

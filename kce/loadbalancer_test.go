@@ -14,7 +14,8 @@ import (
 )
 
 type mockLBController struct {
-	items []core.LoadBalancer
+	createdItems int
+	items        []core.LoadBalancer
 }
 
 func (lbc *mockLBController) List(_ context.Context, _ *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error) {
@@ -68,8 +69,20 @@ func (lbc *mockLBController) Update(ctx context.Context, lb *core.LoadBalancer, 
 	return nil, nil, fmt.Errorf("unimplemented")
 }
 
-func (lbc *mockLBController) Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
-	return nil, nil, fmt.Errorf("unimplemented")
+func (lbc *mockLBController) Create(_ context.Context, _ *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+	newItem := core.LoadBalancer{
+		ID:           fmt.Sprintf("created-%d", lbc.createdItems),
+		IPAddress:    &core.IPAddress{Address: fmt.Sprintf("10.0.0.%d", lbc.createdItems)},
+		ResourceType: args.ResourceType,
+		Name:         args.Name,
+	}
+	if args.ResourceIDs != nil {
+		newItem.ResourceIDs = *args.ResourceIDs
+	}
+	lbc.items = append(lbc.items, newItem)
+	lbc.createdItems++
+
+	return &newItem, &katapult.Response{}, nil
 }
 
 type mockLBRController struct {
@@ -727,6 +740,95 @@ func TestLoadBalancerManager_ensureLoadBalancerRules(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
+	tests := []struct {
+		name string
+
+		loadBalancers []core.LoadBalancer
+
+		service *v1.Service
+
+		wantStatus        *v1.LoadBalancerStatus
+		wantLoadBalancers []core.LoadBalancer
+
+		wantErr string
+	}{
+		{
+			name: "uses existing LB",
+			loadBalancers: []core.LoadBalancer{
+				{
+					ID:        "lb_npORVDLVrf7MlghA",
+					Name:      "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{}},
+			},
+
+			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
+				{
+					IP: "133.7.42.0",
+				},
+			}},
+			wantLoadBalancers: []core.LoadBalancer{
+				{
+					ID:        "lb_npORVDLVrf7MlghA",
+					Name:      "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
+				},
+			},
+		},
+		{
+			name:          "create lb",
+			loadBalancers: []core.LoadBalancer{},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{}},
+			},
+
+			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
+				{
+					IP: "10.0.0.0",
+				},
+			}},
+			wantLoadBalancers: []core.LoadBalancer{
+				{
+					ID:           "created-0",
+					Name:         "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					IPAddress:    &core.IPAddress{Address: "10.0.0.0"},
+					ResourceType: core.TagsResourceType,
+					ResourceIDs:  []string{"node-tag-id"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lbc := &mockLBController{items: tt.loadBalancers}
+			lbrc := &mockLBRController{items: []core.LoadBalancerRule{}}
+			lbm := loadBalancerManager{
+				config:                     Config{NodeTagID: "node-tag-id"},
+				loadBalancerController:     lbc,
+				loadBalancerRuleController: lbrc,
+				log:                        logTest.TestLogger{T: t},
+			}
+
+			status, err := lbm.EnsureLoadBalancer(context.TODO(), "example", tt.service, []*v1.Node{})
+			assert.Equal(t, tt.wantLoadBalancers, lbc.items)
+			assert.Equal(t, tt.wantStatus, status)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadBalancerManager_UpdateLoadBalancer(t *testing.T) {
 	assert.Nil(t,
 		(&loadBalancerManager{}).UpdateLoadBalancer(
