@@ -60,7 +60,6 @@ tools: $(TOOLS)
 # Development
 #
 
-TEST ?= $$(go list ./... | grep -v 'vendor')
 BENCH ?= .
 
 .PHONY: clean
@@ -70,7 +69,7 @@ clean:
 
 .PHONY: test
 test:
-	go test $(V) -race $(TESTARGS) $(TEST)
+	go test $(V) -race $(TESTARGS) ./...
 
 .PHONY: lint
 lint: golangci-lint
@@ -83,7 +82,7 @@ format:
 .SILENT: bench
 .PHONY: bench
 bench:
-	go test $(V) -count=1 -bench=$(BENCH) $(TESTARGS) $(TEST)
+	go test $(V) -count=1 -bench=$(BENCH) $(TESTARGS) ./...
 
 #
 # Coverage
@@ -101,7 +100,7 @@ cov-func: coverage.out
 	go tool cover -func=./coverage.out
 
 coverage.out: $(SOURCES)
-	go test $(V) -covermode=count -coverprofile=./coverage.out ./...
+	go test $(V) $(TESTARGS)  -covermode=count -coverprofile=./coverage.out ./...
 
 #
 # Dependencies
