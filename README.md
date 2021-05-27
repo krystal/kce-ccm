@@ -2,8 +2,8 @@
 
 [![Test Coverage](https://api.codeclimate.com/v1/badges/464449b5a40461b8072a/test_coverage)](https://codeclimate.com/github/krystal/kce-ccm/test_coverage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/krystal/kce-ccm)](https://goreportcard.com/report/github.com/krystal/kce-ccm)
-[![GitHub last commit](https://img.shields.io/github/last-commit/krystal/go-katapult.svg?style=flat&logo=github&logoColor=white)](https://github.com/krystal/go-katapult/commits/main)
-[![GitHub issues](https://img.shields.io/github/issues-raw/krystal/go-katapult.svg?style=flat&logo=github&logoColor=white)](https://github.com/krystal/go-katapult/issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/krystal/kce-ccm.svg?style=flat&logo=github&logoColor=white)](https://github.com/krystal/kce-ccm/commits/main)
+[![GitHub issues](https://img.shields.io/github/issues-raw/krystal/kce-ccm.svg?style=flat&logo=github&logoColor=white)](https://github.com/krystal/kce-ccm/issues)
 
 The Katapult Container Engine Cloud Controller Manager is a set of tools that is
 designed to monitor nodes & provision load balancers.
