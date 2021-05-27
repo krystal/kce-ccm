@@ -27,17 +27,17 @@ import (
 // LB services must be managed in the alternate implementation.
 
 type loadBalancerController interface {
-	List(ctx context.Context, org *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error)
-	Delete(ctx context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error)
-	Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error)
-	Create(ctx context.Context, org *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error)
+	List(ctx context.Context, org core.OrganizationRef, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error)
+	Delete(ctx context.Context, lb core.LoadBalancerRef) (*core.LoadBalancer, *katapult.Response, error)
+	Update(ctx context.Context, lb core.LoadBalancerRef, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error)
+	Create(ctx context.Context, org core.OrganizationRef, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error)
 }
 
 type loadBalancerRuleController interface {
-	List(ctx context.Context, lb *core.LoadBalancer, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error)
-	Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error)
-	Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
-	Create(ctx context.Context, org *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
+	List(ctx context.Context, lb core.LoadBalancerRef, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error)
+	Delete(ctx context.Context, lbr core.LoadBalancerRuleRef) (*core.LoadBalancerRule, *katapult.Response, error)
+	Update(ctx context.Context, rule core.LoadBalancerRuleRef, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
+	Create(ctx context.Context, org core.LoadBalancerRef, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error)
 }
 
 type loadBalancerManager struct {
@@ -69,7 +69,7 @@ func (lbm *loadBalancerManager) listLoadBalancers(ctx context.Context) ([]*core.
 }
 
 // listLoadBalancerRules fetches all LBRs for an LB, paging where necessary
-func (lbm *loadBalancerManager) listLoadBalancerRules(ctx context.Context, lb *core.LoadBalancer) ([]core.LoadBalancerRule, error) {
+func (lbm *loadBalancerManager) listLoadBalancerRules(ctx context.Context, lb core.LoadBalancerRef) ([]core.LoadBalancerRule, error) {
 	list, resp, err := lbm.loadBalancerRuleController.List(ctx, lb, nil)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (lbm *loadBalancerManager) GetLoadBalancerName(_ context.Context, clusterNa
 // tidyLoadBalancerRules deletes rules that are no longer in use by the service
 // TODO: Instrumentation for number of entities cleaned up
 func (lbm *loadBalancerManager) tidyLoadBalancerRules(ctx context.Context, service *v1.Service, lb *core.LoadBalancer) error {
-	rules, err := lbm.listLoadBalancerRules(ctx, lb)
+	rules, err := lbm.listLoadBalancerRules(ctx, lb.Ref())
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (lbm *loadBalancerManager) tidyLoadBalancerRules(ctx context.Context, servi
 				"ruleId", rule.ID,
 				"rulePort", rule.ListenPort,
 			)
-			_, _, err := lbm.loadBalancerRuleController.Delete(ctx, &rule)
+			_, _, err := lbm.loadBalancerRuleController.Delete(ctx, rule.Ref())
 			if err != nil {
 				return err
 			}
@@ -178,7 +178,7 @@ func (lbm *loadBalancerManager) tidyLoadBalancerRules(ctx context.Context, servi
 // by a kubernetes service.
 // TODO: Instrumentation for number of entities created etc
 func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, service *v1.Service, lb *core.LoadBalancer) error {
-	rules, err := lbm.listLoadBalancerRules(ctx, lb)
+	rules, err := lbm.listLoadBalancerRules(ctx, lb.Ref())
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 				"servicePortName", servicePort.Name,
 				"servicePortTarget", servicePort.TargetPort,
 			)
-			_, _, err := lbm.loadBalancerRuleController.Create(ctx, lb, lbRuleArgs)
+			_, _, err := lbm.loadBalancerRuleController.Create(ctx, lb.Ref(), lbRuleArgs)
 			if err != nil {
 				return err
 			}
@@ -236,7 +236,7 @@ func (lbm *loadBalancerManager) ensureLoadBalancerRules(ctx context.Context, ser
 				"args", lbRuleArgs,
 			)
 			// TODO: Matcher to avoid unnecessary updates
-			_, _, err := lbm.loadBalancerRuleController.Update(ctx, foundRule, lbRuleArgs)
+			_, _, err := lbm.loadBalancerRuleController.Update(ctx, foundRule.Ref(), lbRuleArgs)
 			if err != nil {
 				return err
 			}
@@ -324,6 +324,6 @@ func (lbm *loadBalancerManager) EnsureLoadBalancerDeleted(ctx context.Context, c
 		return err
 	}
 
-	_, _, err = lbm.loadBalancerController.Delete(ctx, balancer)
+	_, _, err = lbm.loadBalancerController.Delete(ctx, balancer.Ref())
 	return err
 }

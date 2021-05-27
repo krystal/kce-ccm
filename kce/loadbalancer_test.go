@@ -18,7 +18,7 @@ type mockLBController struct {
 	items        []core.LoadBalancer
 }
 
-func (lbc *mockLBController) List(_ context.Context, _ *core.Organization, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error) {
+func (lbc *mockLBController) List(_ context.Context, _ core.OrganizationRef, opts *core.ListOptions) ([]*core.LoadBalancer, *katapult.Response, error) {
 	perPage := 2
 	page := 1
 	if opts != nil {
@@ -54,7 +54,7 @@ func (lbc *mockLBController) List(_ context.Context, _ *core.Organization, opts 
 	}, nil
 }
 
-func (lbc *mockLBController) Delete(_ context.Context, lb *core.LoadBalancer) (*core.LoadBalancer, *katapult.Response, error) {
+func (lbc *mockLBController) Delete(_ context.Context, lb core.LoadBalancerRef) (*core.LoadBalancer, *katapult.Response, error) {
 	for i, item := range lbc.items {
 		if item.ID == lb.ID {
 			lbc.items = append(lbc.items[:i], lbc.items[i+1:]...)
@@ -65,11 +65,11 @@ func (lbc *mockLBController) Delete(_ context.Context, lb *core.LoadBalancer) (*
 	return nil, nil, fmt.Errorf("tried to delete non-existent element")
 }
 
-func (lbc *mockLBController) Update(ctx context.Context, lb *core.LoadBalancer, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+func (lbc *mockLBController) Update(ctx context.Context, lb core.LoadBalancerRef, args *core.LoadBalancerUpdateArguments) (*core.LoadBalancer, *katapult.Response, error) {
 	return nil, nil, fmt.Errorf("unimplemented")
 }
 
-func (lbc *mockLBController) Create(_ context.Context, _ *core.Organization, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
+func (lbc *mockLBController) Create(_ context.Context, _ core.OrganizationRef, args *core.LoadBalancerCreateArguments) (*core.LoadBalancer, *katapult.Response, error) {
 	newItem := core.LoadBalancer{
 		ID:           fmt.Sprintf("created-%d", lbc.createdItems),
 		IPAddress:    &core.IPAddress{Address: fmt.Sprintf("10.0.0.%d", lbc.createdItems)},
@@ -90,7 +90,7 @@ type mockLBRController struct {
 	items        []core.LoadBalancerRule
 }
 
-func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error) {
+func (lbr *mockLBRController) List(_ context.Context, _ core.LoadBalancerRef, opts *core.ListOptions) ([]core.LoadBalancerRule, *katapult.Response, error) {
 	perPage := 2
 	page := 1
 	if opts != nil {
@@ -125,7 +125,7 @@ func (lbr *mockLBRController) List(_ context.Context, _ *core.LoadBalancer, opts
 	}, nil
 }
 
-func (lbrc *mockLBRController) Delete(ctx context.Context, lbr *core.LoadBalancerRule) (*core.LoadBalancerRule, *katapult.Response, error) {
+func (lbrc *mockLBRController) Delete(ctx context.Context, lbr core.LoadBalancerRuleRef) (*core.LoadBalancerRule, *katapult.Response, error) {
 	for i, item := range lbrc.items {
 		if item.ID == lbr.ID {
 			lbrc.items = append(lbrc.items[:i], lbrc.items[i+1:]...)
@@ -154,7 +154,7 @@ func mergeInt(a, b int) int {
 	return b
 }
 
-func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalancerRule, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+func (lbrc *mockLBRController) Update(ctx context.Context, rule core.LoadBalancerRuleRef, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
 	updateItem := core.LoadBalancerRule{}
 	updateIndex := -1
 	for i, item := range lbrc.items {
@@ -190,7 +190,7 @@ func (lbrc *mockLBRController) Update(ctx context.Context, rule *core.LoadBalanc
 	return &updateItem, &katapult.Response{}, nil
 }
 
-func (lbrc *mockLBRController) Create(ctx context.Context, lb *core.LoadBalancer, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
+func (lbrc *mockLBRController) Create(ctx context.Context, lb core.LoadBalancerRef, args core.LoadBalancerRuleArguments) (*core.LoadBalancerRule, *katapult.Response, error) {
 	for _, item := range lbrc.items {
 		if item.ListenPort == args.ListenPort {
 			return &item, &katapult.Response{}, fmt.Errorf("already existing listen port")
@@ -341,7 +341,7 @@ func TestLoadBalancerManager_listLoadBalancerRules(t *testing.T) {
 				log:                        logTest.TestLogger{T: t},
 			}
 
-			got, err := lbm.listLoadBalancerRules(context.TODO(), &core.LoadBalancer{})
+			got, err := lbm.listLoadBalancerRules(context.TODO(), core.LoadBalancerRef{})
 			assert.Equal(t, tt.want, got)
 			if tt.wantErr == "" {
 				assert.NoError(t, err)

@@ -12,7 +12,7 @@ func TestConfig_orgRef(t *testing.T) {
 		OrganizationID: "a-fake-org",
 	}
 
-	assert.Equal(t, &core.Organization{ID: "a-fake-org"}, c.orgRef())
+	assert.Equal(t, core.OrganizationRef{ID: "a-fake-org"}, c.orgRef())
 }
 
 func TestConfig_dcRef(t *testing.T) {
@@ -20,7 +20,7 @@ func TestConfig_dcRef(t *testing.T) {
 		DataCenterID: "atlantis-central-1",
 	}
 
-	assert.Equal(t, &core.DataCenter{ID: "atlantis-central-1"}, c.dcRef())
+	assert.Equal(t, core.DataCenterRef{ID: "atlantis-central-1"}, c.dcRef())
 }
 
 func Test_loadConfig(t *testing.T) {
