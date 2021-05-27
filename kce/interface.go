@@ -23,14 +23,14 @@ type Config struct {
 	NodeTagID string `env:"KATAPULT_NODE_TAG_RID"`
 }
 
-func (c Config) orgRef() *core.Organization {
-	return &core.Organization{
+func (c Config) orgRef() core.OrganizationRef {
+	return core.OrganizationRef{
 		ID: c.OrganizationID,
 	}
 }
 
-func (c Config) dcRef() *core.DataCenter {
-	return &core.DataCenter{
+func (c Config) dcRef() core.DataCenterRef {
+	return core.DataCenterRef{
 		ID: c.DataCenterID,
 	}
 }
