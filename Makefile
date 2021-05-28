@@ -147,3 +147,20 @@ check-tidy:
 docs: godoc
 	$(info serviing docs on http://127.0.0.1:6060/pkg/$(GOMODNAME)/)
 	@godoc -http=127.0.0.1:6060
+
+.PHONY: alpha-version
+alpha-version: check-npx
+	npx standard-version --prerelease alpha
+
+.PHONY: new-version
+new-version: check-npx
+	npx standard-version
+
+.PHONY: next-version
+next-version: check-npx
+	npx standard-version --dry-run
+
+.PHONY: check-npx
+check-npx:
+	$(if $(shell which npx),,\
+		$(error No npx found in PATH, please install NodeJS))
