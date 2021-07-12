@@ -265,7 +265,7 @@ func (lbm *loadBalancerManager) EnsureLoadBalancer(ctx context.Context, clusterN
 		lb, _, err = lbm.loadBalancerController.Create(ctx, lbm.config.orgRef(), &core.LoadBalancerCreateArguments{
 			Name:         name,
 			DataCenter:   lbm.config.dcRef(),
-			ResourceType: core.TagsResourceType,
+			ResourceType: core.VirtualMachineGroupsResourceType,
 			ResourceIDs:  &[]string{lbm.config.NodeTagID},
 		})
 		if err != nil {

@@ -799,7 +799,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 					ID:           "created-0",
 					Name:         "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
 					IPAddress:    &core.IPAddress{Address: "10.0.0.0"},
-					ResourceType: core.TagsResourceType,
+					ResourceType: core.VirtualMachineGroupsResourceType,
 					ResourceIDs:  []string{"node-tag-id"},
 				},
 			},
