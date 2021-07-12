@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.4](https://github.com/krystal/kce-ccm/compare/v0.0.3...v0.0.4) (2021-07-12)
+
+
+### Bug Fixes
+
+* incorrect resource type for load balancers ([0ed8646](https://github.com/krystal/kce-ccm/commit/0ed86469bef86d9757a027c68d64f1ed1a5193de))
+
 ### [0.0.3](https://github.com/krystal/kce-ccm/compare/v0.0.2...v0.0.3) (2021-05-28)
 
 
