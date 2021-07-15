@@ -105,10 +105,19 @@ func (lbm *loadBalancerManager) getLoadBalancer(ctx context.Context, name string
 }
 
 func loadBalancerName(clusterName string, service *v1.Service) string {
-	// kubernetes uid looks like this "b5216b07-2cb4-4429-8294-23883301a01e"
-	// we want to produce a deterministic load balancer name from this.
-	// katapult has a limit of 255 characters on name length
-	return fmt.Sprintf("k8s-%s-%s", clusterName, service.UID)
+	// we want to produce a deterministic load balancer name from the service
+	// katapult has a limit of 60 characters on name length
+	ns := ""
+	if service.Namespace != "default" {
+		ns = fmt.Sprintf("%s-", service.Namespace)
+	}
+	untrimmed := fmt.Sprintf("k8s-%s-%s%s", clusterName, ns, service.Name)
+
+	const trimLength = 60
+	if len(untrimmed) > trimLength {
+		return untrimmed[0:trimLength]
+	}
+	return untrimmed
 }
 
 // GetLoadBalancer returns whether the specified load balancer exists, and

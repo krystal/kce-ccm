@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -435,13 +436,16 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 			name: "exists",
 			loadBalancers: []core.LoadBalancer{
 				{
-					Name:      "k8s-test-b5216b07-2cb4-4429-8294-23883301a01e",
+					Name:      "k8s-test-test-service",
 					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
 				},
 			},
 			clusterName: "test",
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
 			},
 			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
 				{
@@ -454,7 +458,10 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 			name:        "nonexistent",
 			clusterName: "test",
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
 			},
 			wantExists: false,
 		},
@@ -467,7 +474,10 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 				},
 			},
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
 			},
 			wantExists: false,
 			wantErr:    "error from 0",
@@ -495,21 +505,63 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 }
 
 func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
-	lbm := loadBalancerManager{}
+	tests := []struct {
+		name string
 
-	got := lbm.GetLoadBalancerName(
-		context.TODO(),
-		"big-bad-cluster",
-		&v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				UID: "b5216b07-2cb4-4429-8294-23883301a01e",
+		clusterName string
+		service     *v1.Service
+
+		want string
+	}{
+		{
+			name:        "default ns",
+			clusterName: "boo",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foobar",
+					Namespace: "default",
+				},
 			},
+			want: "k8s-boo-foobar",
 		},
-	)
+		{
+			name:        "custom ns",
+			clusterName: "boo",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foobar",
+					Namespace: "not-default",
+				},
+			},
+			want: "k8s-boo-not-default-foobar",
+		},
+		{
+			name:        "ensure trim to 60",
+			clusterName: "boo",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      strings.Repeat("a", 100),
+					Namespace: "not-default",
+				},
+			},
+			want: "k8s-boo-not-default-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	}
 
-	want := "k8s-big-bad-cluster-b5216b07-2cb4-4429-8294-23883301a01e"
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lbm := loadBalancerManager{}
 
-	assert.Equal(t, want, got)
+			got := lbm.GetLoadBalancerName(
+				context.TODO(),
+				tc.clusterName,
+				tc.service,
+			)
+
+			assert.Equal(t, tc.want, got)
+		})
+	}
+
 }
 
 func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
@@ -529,13 +581,16 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 			name: "deletes",
 			loadBalancers: []core.LoadBalancer{
 				{
-					Name:      "k8s-test-b5216b07-2cb4-4429-8294-23883301a01e",
+					Name:      "k8s-test-bar-foo",
 					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
 				},
 			},
 			clusterName: "test",
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
 			},
 
 			wantLoadBalancers: []core.LoadBalancer{},
@@ -545,7 +600,10 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 			loadBalancers: []core.LoadBalancer{},
 			clusterName:   "test",
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
 			},
 			wantLoadBalancers: []core.LoadBalancer{},
 		},
@@ -558,7 +616,10 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 				},
 			},
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
 			},
 			wantLoadBalancers: []core.LoadBalancer{
 				{
@@ -759,13 +820,16 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			loadBalancers: []core.LoadBalancer{
 				{
 					ID:        "lb_npORVDLVrf7MlghA",
-					Name:      "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					Name:      "k8s-example-foobar-bar",
 					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
 				},
 			},
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
-				Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{}},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foobar",
+				},
+				Spec: v1.ServiceSpec{Ports: []v1.ServicePort{}},
 			},
 
 			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
@@ -776,7 +840,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			wantLoadBalancers: []core.LoadBalancer{
 				{
 					ID:        "lb_npORVDLVrf7MlghA",
-					Name:      "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					Name:      "k8s-example-foobar-bar",
 					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
 				},
 			},
@@ -785,8 +849,11 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			name:          "create lb",
 			loadBalancers: []core.LoadBalancer{},
 			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{UID: "b5216b07-2cb4-4429-8294-23883301a01e"},
-				Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{}},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foobar",
+				},
+				Spec: v1.ServiceSpec{Ports: []v1.ServicePort{}},
 			},
 
 			wantStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{
@@ -797,7 +864,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			wantLoadBalancers: []core.LoadBalancer{
 				{
 					ID:           "created-0",
-					Name:         "k8s-example-b5216b07-2cb4-4429-8294-23883301a01e",
+					Name:         "k8s-example-foobar-bar",
 					IPAddress:    &core.IPAddress{Address: "10.0.0.0"},
 					ResourceType: core.VirtualMachineGroupsResourceType,
 					ResourceIDs:  []string{"node-tag-id"},
