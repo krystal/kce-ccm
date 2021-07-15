@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.5](https://github.com/krystal/kce-ccm/compare/v0.0.4...v0.0.5) (2021-07-15)
+
+
+### Features
+
+* name load balancers in a friendlier way ([#12](https://github.com/krystal/kce-ccm/issues/12)) ([8ca001f](https://github.com/krystal/kce-ccm/commit/8ca001fce35fbbf7c3212d9c05d664f28da3c8f7))
+
 ### [0.0.4](https://github.com/krystal/kce-ccm/compare/v0.0.3...v0.0.4) (2021-07-12)
 
 
