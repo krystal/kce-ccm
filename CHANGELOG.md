@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.6](https://github.com/krystal/kce-ccm/compare/v0.0.5...v0.0.6) (2021-07-20)
+
+
+### Bug Fixes
+
+* name LB with KCE not k8s ([#14](https://github.com/krystal/kce-ccm/issues/14)) ([74f0c98](https://github.com/krystal/kce-ccm/commit/74f0c987d4d7bb000e72406af305a8f079ddcd96))
+
 ### [0.0.5](https://github.com/krystal/kce-ccm/compare/v0.0.4...v0.0.5) (2021-07-15)
 
 
