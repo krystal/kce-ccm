@@ -436,7 +436,7 @@ func TestLoadBalancerManager_GetLoadBalancer(t *testing.T) {
 			name: "exists",
 			loadBalancers: []core.LoadBalancer{
 				{
-					Name:      "k8s-test-test-service",
+					Name:      "kce-test-test-service",
 					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
 				},
 			},
@@ -522,7 +522,7 @@ func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			want: "k8s-boo-foobar",
+			want: "kce-boo-foobar",
 		},
 		{
 			name:        "custom ns",
@@ -533,7 +533,7 @@ func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 					Namespace: "not-default",
 				},
 			},
-			want: "k8s-boo-not-default-foobar",
+			want: "kce-boo-not-default-foobar",
 		},
 		{
 			name:        "ensure trim to 60",
@@ -544,7 +544,7 @@ func TestLoadBalancerManager_GetLoadBalancerName(t *testing.T) {
 					Namespace: "not-default",
 				},
 			},
-			want: "k8s-boo-not-default-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			want: "kce-boo-not-default-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		},
 	}
 
@@ -581,7 +581,7 @@ func TestLoadBalancerManager_EnsureLoadBalancerDeleted(t *testing.T) {
 			name: "deletes",
 			loadBalancers: []core.LoadBalancer{
 				{
-					Name:      "k8s-test-bar-foo",
+					Name:      "kce-test-bar-foo",
 					IPAddress: &core.IPAddress{Address: "10.0.0.1"},
 				},
 			},
@@ -820,7 +820,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			loadBalancers: []core.LoadBalancer{
 				{
 					ID:        "lb_npORVDLVrf7MlghA",
-					Name:      "k8s-example-foobar-bar",
+					Name:      "kce-example-foobar-bar",
 					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
 				},
 			},
@@ -840,7 +840,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			wantLoadBalancers: []core.LoadBalancer{
 				{
 					ID:        "lb_npORVDLVrf7MlghA",
-					Name:      "k8s-example-foobar-bar",
+					Name:      "kce-example-foobar-bar",
 					IPAddress: &core.IPAddress{Address: "133.7.42.0"},
 				},
 			},
@@ -864,7 +864,7 @@ func TestLoadBalancerManager_EnsureLoadBalancer(t *testing.T) {
 			wantLoadBalancers: []core.LoadBalancer{
 				{
 					ID:           "created-0",
-					Name:         "k8s-example-foobar-bar",
+					Name:         "kce-example-foobar-bar",
 					IPAddress:    &core.IPAddress{Address: "10.0.0.0"},
 					ResourceType: core.VirtualMachineGroupsResourceType,
 					ResourceIDs:  []string{"node-tag-id"},
