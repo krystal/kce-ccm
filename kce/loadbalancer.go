@@ -111,7 +111,7 @@ func loadBalancerName(clusterName string, service *v1.Service) string {
 	if service.Namespace != "default" {
 		ns = fmt.Sprintf("%s-", service.Namespace)
 	}
-	untrimmed := fmt.Sprintf("k8s-%s-%s%s", clusterName, ns, service.Name)
+	untrimmed := fmt.Sprintf("kce-%s-%s%s", clusterName, ns, service.Name)
 
 	const trimLength = 60
 	if len(untrimmed) > trimLength {
